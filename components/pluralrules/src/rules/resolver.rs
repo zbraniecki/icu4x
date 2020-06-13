@@ -1,5 +1,18 @@
 use super::ast;
 use crate::operands::PluralOperands;
+use crate::PluralCategory;
+
+pub fn select(
+    rules: &[(PluralCategory, ast::Condition)],
+    operands: &PluralOperands,
+) -> PluralCategory {
+    for (category, rule) in rules {
+        if matches(rule, operands) {
+            return *category;
+        }
+    }
+    PluralCategory::Other
+}
 
 pub fn matches(condition: &ast::Condition, operands: &PluralOperands) -> bool {
     condition
@@ -44,6 +57,7 @@ fn matches_range_item(item: &ast::RangeListItem, value: u64, operator: &ast::Ope
         },
         ast::RangeListItem::Range((start, end)) => match operator {
             ast::Operator::Eq => value >= start.0 as u64 && value <= end.0 as u64,
+            ast::Operator::NotEq => value < start.0 as u64 || value > end.0 as u64,
             _ => unimplemented!(),
         },
     }

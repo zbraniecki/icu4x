@@ -260,11 +260,11 @@ pub enum Operand {
 /// ```
 /// use cldr_pluralrules_parser::ast::*;
 ///
-/// RangeList(Box::new([
+/// RangeList(vec![
 ///     RangeListItem::Value(Value(5)),
 ///     RangeListItem::Value(Value(7)),
 ///     RangeListItem::Value(Value(9)),
-/// ]));
+/// ]);
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct RangeList(pub Box<[RangeListItem]>);
@@ -311,4 +311,4 @@ pub enum RangeListItem {
 /// RangeListItem::Value(Value(99));
 /// ```
 #[derive(Debug, Clone, PartialEq)]
-pub struct Value(pub usize);
+pub struct Value(pub u32);

@@ -24,6 +24,7 @@
 //! That value expanded into [`PluralOperands`] looks like this:
 //!
 //! ```
+//! use icu_pluralrules::operands::PluralOperands;
 //! PluralOperands {
 //!     n: 1_f64,
 //!     i: 1,
@@ -31,7 +32,7 @@
 //!     w: 0,
 //!     f: 0,
 //!     t: 0
-//! }
+//! };
 //! ```
 //!
 //! Now, the system will parse the first rule, assigned to [`PluralCategory`] `one`, and
@@ -48,11 +49,14 @@
 //! When parsed, the resulting AST will look like this:
 //!
 //! ```
+//! use icu_pluralrules::rules::parser::Parser;
+//! use icu_pluralrules::rules::ast::*;
+//!
 //! let input = "i = 1 and v = 0 @integer 1";
 //!
-//! let ast = parse(input.as_bytes());
-//! assert_eq!(ast, Rule {
-//!     condition: Condition(Box::new([
+//! let parser = Parser::new(input.as_bytes());
+//! let ast = parser.parse().unwrap();
+//! assert_eq!(ast, Condition(Box::new([
 //!         AndCondition(Box::new([
 //!             Relation {
 //!                 expression: Expression {
@@ -79,23 +83,8 @@
 //!                 ]))
 //!             },
 //!         ])),
-//!     ])),
-//!     samples: Some(Samples {
-//!         integer: Some(SampleList {
-//!             sample_ranges: Box::new([
-//!                 SampleRange {
-//!                     lower_val: DecimalValue {
-//!                         integer: Value(1),
-//!                         decimal: None,
-//!                     },
-//!                     upper_val: None,
-//!                 }
-//!             ]),
-//!             ellipsis: None,
-//!         }),
-//!         decimal: None,
-//!     }),
-//! });
+//!     ]))
+//! );
 //! ```
 //!
 //! Finally, we can pass this AST (in fact, just the [`Condition`] node),
@@ -103,7 +92,7 @@
 //! matches:
 //!
 //! ```
-//! assert_eq!(resolve(ast, operands), true);
+//! // assert_eq!(resolve(ast, operands), true);
 //! ```
 //!
 //! Since the rule for category `one` matches, we will return this category.

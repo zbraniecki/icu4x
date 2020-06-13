@@ -1,4 +1,4 @@
-mod data;
+pub mod data;
 pub mod operands;
 pub mod rules;
 
@@ -12,7 +12,7 @@ pub enum PluralRuleType {
     Cardinal,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
 pub enum PluralCategory {
     Zero,
     One,
@@ -22,24 +22,33 @@ pub enum PluralCategory {
     Other,
 }
 
+impl PluralCategory {
+    pub fn iter() -> &'static [Self] {
+        &[
+            Self::Zero,
+            Self::One,
+            Self::Two,
+            Self::Few,
+            Self::Many,
+            Self::Other,
+        ]
+    }
+}
+
 pub struct PluralRules {
     locale: LanguageIdentifier,
-    rule: ast::Condition,
+    rules: Box<[(PluralCategory, ast::Condition)]>,
 }
 
 impl PluralRules {
     pub fn try_new(locale: LanguageIdentifier, type_: PluralRuleType) -> Result<Self, ()> {
-        let rule = data::get_rule(&locale, type_);
-        Ok(Self { locale, rule })
+        let rules = data::get_rules(&locale, type_);
+        Ok(Self { locale, rules })
     }
 
     pub fn select<I: Into<PluralOperands>>(&self, input: I) -> PluralCategory {
         let operands: PluralOperands = input.into();
-        if rules::resolver::matches(&self.rule, &operands) {
-            PluralCategory::One
-        } else {
-            PluralCategory::Other
-        }
+        rules::resolver::select(&self.rules, &operands)
     }
 
     pub fn get_locale(&self) -> &LanguageIdentifier {
