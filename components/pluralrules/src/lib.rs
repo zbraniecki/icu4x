@@ -54,4 +54,8 @@ impl PluralRules {
     pub fn get_locale(&self) -> &LanguageIdentifier {
         &self.locale
     }
+
+    pub fn my_test(&self) -> bool {
+        true
+    }
 }
