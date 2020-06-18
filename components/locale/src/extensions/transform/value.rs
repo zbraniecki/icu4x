@@ -46,7 +46,7 @@ impl Value {
     /// assert_eq!(&value.to_string(), "hybrid");
     /// ```
     pub fn from_bytes(input: &[u8]) -> Result<Self, ParserError> {
-        let mut v = vec![];
+        let mut v = Vec::new();
         let mut has_value = false;
 
         for subtag in input.split(|c| *c == b'-' || *c == b'_') {
@@ -66,15 +66,15 @@ impl Value {
         Ok(Self(v.into_boxed_slice()))
     }
 
-    pub(crate) fn from_vec_unchecked(input: Vec<TinyStr8>) -> Self {
+    pub fn from_vec_unchecked(input: Vec<TinyStr8>) -> Self {
         Self(input.into_boxed_slice())
     }
 
-    pub(crate) fn is_type_subtag(t: &[u8]) -> bool {
+    pub fn is_type_subtag(t: &[u8]) -> bool {
         TYPE_LENGTH.contains(&t.len()) && !t.iter().any(|c: &u8| !c.is_ascii_alphanumeric())
     }
 
-    pub(crate) fn parse_subtag(t: &[u8]) -> Result<Option<TinyStr8>, ParserError> {
+    pub fn parse_subtag(t: &[u8]) -> Result<Option<TinyStr8>, ParserError> {
         let s = TinyStr8::from_bytes(t).map_err(|_| ParserError::InvalidSubtag)?;
         if !TYPE_LENGTH.contains(&t.len()) || !s.is_ascii_alphanumeric() {
             return Err(ParserError::InvalidExtension);
