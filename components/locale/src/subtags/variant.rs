@@ -77,6 +77,10 @@ impl Variant {
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
+
+    pub fn another_test(&mut self) -> bool {
+        false
+    }
 }
 
 impl FromStr for Variant {

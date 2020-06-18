@@ -100,6 +100,10 @@ impl LanguageIdentifier {
         parse_language_identifier(v, ParserMode::Locale)
     }
 
+    pub fn test_fn(&self) -> bool {
+        true
+    }
+
     /// This is a best-effort operation that performs all available levels of canonicalization.
     ///
     /// At the moment the operation will normalize casing and the separator, but in the future

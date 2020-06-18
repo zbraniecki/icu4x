@@ -40,10 +40,7 @@ impl Key {
     /// assert_eq!(key, "ca");
     /// ```
     pub fn from_bytes(key: &[u8]) -> Result<Self, ParserError> {
-        if key.len() != KEY_LENGTH
-            || !key[0].is_ascii_alphanumeric()
-            || !key[1].is_ascii_alphabetic()
-        {
+        if key.len() != KEY_LENGTH {
             return Err(ParserError::InvalidExtension);
         }
 
