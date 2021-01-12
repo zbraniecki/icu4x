@@ -6,7 +6,7 @@ mod parser;
 
 use crate::fields::{self, Field, FieldLength, FieldSymbol};
 pub use error::Error;
-use parser::Parser;
+pub use parser::Parser;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
 

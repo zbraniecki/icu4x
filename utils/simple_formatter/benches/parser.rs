@@ -10,33 +10,14 @@ fn parser(c: &mut Criterion) {
         ("Foo {0} and {1}", vec!["Hello", "World"]),
         ("Foo {1} and {0}", vec!["Hello", "World"]),
         ("{start}, {midde} and {end}", vec!["Start", "Middle", "End"]),
+        // ("{0} 'at' {1}", vec!["Hello", "World"]),
     ];
-
-    c.bench_function("parser/owned", |b| {
-        b.iter(|| {
-            for sample in &samples {
-                let parser = Parser::new(sample.0.to_string());
-                let _ = parser.parse();
-            }
-        })
-    });
 
     c.bench_function("parser/idx", |b| {
         b.iter(|| {
             for sample in &samples {
-                let parser = Parser2::new();
+                let parser = Parser::new();
                 let _ = parser.parse(sample.0);
-            }
-        })
-    });
-
-    c.bench_function("format/owned", |b| {
-        b.iter(|| {
-            for sample in &samples {
-                let parser = Parser::new(sample.0.to_string());
-                let elements = parser.parse();
-                let mut result = String::new();
-                write_format(&mut result, elements, &sample.1);
             }
         })
     });
@@ -44,10 +25,10 @@ fn parser(c: &mut Criterion) {
     c.bench_function("format/idx", |b| {
         b.iter(|| {
             for sample in &samples {
-                let parser = Parser2::new();
+                let parser = Parser::new();
                 let elements = parser.parse(sample.0);
                 let mut result = String::new();
-                write_format2(&mut result, sample.0, elements, &sample.1);
+                write_format(&mut result, &elements, &sample.1);
             }
         })
     });

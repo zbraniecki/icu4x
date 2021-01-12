@@ -1,86 +1,60 @@
-use std::ops::Range;
+#[derive(Debug, PartialEq)]
+pub struct Literal<'s> {
+    value: &'s str,
+    quotes: Vec<usize>,
+}
+
+impl<'s> Literal<'s> {
+    pub fn new(value: &'s str) -> Self {
+        Self {
+            value,
+            quotes: vec![],
+        }
+    }
+}
 
 #[derive(Debug, PartialEq)]
-pub enum Element {
-    Placeholder(String),
-    Literal(String),
+pub enum Element<'s> {
+    Placeholder(&'s str),
+    Literal(Literal<'s>),
 }
 
-#[derive(Debug, PartialEq)]
-pub enum Element2 {
-    Placeholder(Range<usize>),
-    Literal(Range<usize>),
-}
-
-pub struct Parser {
-    input: String,
-}
+pub struct Parser {}
 
 impl Parser {
-    pub fn new(input: String) -> Self {
-        Self { input }
-    }
-
-    pub fn parse(self) -> Vec<Element> {
-        let mut result = vec![];
-        let mut current = Element::Literal(String::new());
-        for ch in self.input.chars() {
-            match &mut current {
-                Element::Literal(s) => {
-                    if ch == '{' {
-                        if !s.is_empty() {
-                            result.push(current);
-                        }
-                        current = Element::Placeholder(String::new());
-                    } else {
-                        s.push(ch);
-                    }
-                },
-                Element::Placeholder(s) => {
-                    if ch == '}' {
-                        assert!(!s.is_empty());
-                        result.push(current);
-                        current = Element::Literal(String::new());
-                    } else {
-                        s.push(ch);
-                    }
-                }
-            }
-        }
-        result
-    }
-}
-
-pub struct Parser2 {}
-
-impl Parser2 {
     pub fn new() -> Self {
         Self { }
     }
 
-    pub fn parse(&self, input: &str) -> Vec<Element2> {
+    pub fn parse<'l>(&self, input: &'l str) -> Vec<Element<'l>> {
         let mut result = vec![];
-        let mut current = Element2::Literal(0..0);
-        for ch in input.chars() {
-            match &mut current {
-                Element2::Literal(s) => {
-                    if ch == '{' {
-                        if s.start != s.end {
-                            result.push(current);
-                        }
-                        current = Element2::Placeholder(0..0);
-                    } else {
-                        s.end += 1;
+        let mut in_placeholder = false;
+        let mut quotes = vec![];
+        let mut start = 0;
+
+        let mut bytes = input.bytes().enumerate();
+        while let Some((idx, b)) = bytes.next() {
+            if in_placeholder {
+                if b == b'}' {
+                    assert!(idx != start);
+                    result.push(Element::Placeholder(&input[start..idx]));
+                    in_placeholder = false;
+                    start = idx + 1;
+                }
+            } else {
+                if b == b'{' {
+                    if start != idx {
+                        result.push(Element::Literal(Literal {
+                            value: &input[start..idx],
+                            quotes
+                        }));
+                        quotes = vec![];
                     }
-                },
-                Element2::Placeholder(s) => {
-                    if ch == '}' {
-                        assert!(s.start != s.end);
-                        result.push(current);
-                        current = Element2::Literal(0..0);
-                    } else {
-                        s.end += 1;
-                    }
+                    in_placeholder = true;
+                    start = idx + 1;
+                } else if b == b'\'' {
+                    quotes.push(idx - start);
+                    bytes.next();
                 }
             }
         }
@@ -90,24 +64,28 @@ impl Parser2 {
 
 use std::fmt::{Error, Write};
 
-pub fn write_format<W: Write>(f: &mut W, pattern: Vec<Element>, replacements: &[&str]) -> Result<(), Error> {
+//XXX: We need a way to produce an interpolated list of elements, rather than a string
+pub fn write_format<W: Write>(f: &mut W, pattern: &[Element], replacements: &[&str]) -> Result<(), Error> {
     for element in pattern {
         match element {
-            Element::Literal(s) => f.write_str(&s),
-            Element::Placeholder(s) => f.write_str(&s),
-        };
-    }
-    Ok(())
-}
-
-pub fn write_format2<W: Write>(f: &mut W, input: &str, pattern: Vec<Element2>, replacements: &[&str]) -> Result<(), Error> {
-    for element in pattern {
-        match element {
-            Element2::Literal(r) => {
-                f.write_str(&input[r])
+            Element::Literal(s) => {
+                if s.quotes.is_empty() {
+                    f.write_str(s.value)?;
+                } else {
+                    let mut start = 0;
+                    for idx in &s.quotes {
+                        if start != *idx {
+                            f.write_str(&s.value[start..*idx])?;
+                        }
+                        start = idx + 1;
+                    }
+                    if start < s.value.len() {
+                        f.write_str(&s.value[start..])?;
+                    }
+                }
             },
-            Element2::Placeholder(r) => {
-                f.write_str(&input[r])
+            Element::Placeholder(s) => {
+                f.write_str(s)?;
             },
         };
     }
@@ -137,23 +115,35 @@ mod tests {
     // EEE, MMM d, ''yy
     #[test]
     fn it_works() {
-        let parser = Parser::new("Foo {0} and {1}".to_string());
-        let ast = parser.parse();
+        let parser = Parser::new();
+        let ast = parser.parse("Foo {0} and {1}");
         assert_eq!(ast, vec![
-            Element::Literal("Foo ".to_string()),
-            Element::Placeholder("0".to_string()),
-            Element::Literal(" and ".to_string()),
-            Element::Placeholder("1".to_string()),
+            Element::Literal(Literal { value: "Foo ", quotes: vec![] }),
+            Element::Placeholder("0"),
+            Element::Literal(Literal { value: " and ", quotes: vec![] }),
+            Element::Placeholder("1"),
         ]);
 
-        let parser = Parser::new("{start}, {middle} and {end}".to_string());
-        let ast = parser.parse();
+        let parser = Parser::new();
+        let ast = parser.parse("{start}, {middle} and {end}");
         assert_eq!(ast, vec![
-            Element::Placeholder("start".to_string()),
-            Element::Literal(", ".to_string()),
-            Element::Placeholder("middle".to_string()),
-            Element::Literal(" and ".to_string()),
-            Element::Placeholder("end".to_string()),
+            Element::Placeholder("start"),
+            Element::Literal(Literal { value: ", ", quotes: vec![] }),
+            Element::Placeholder("middle"),
+            Element::Literal(Literal { value: " and ", quotes: vec![] }),
+            Element::Placeholder("end"),
+        ]);
+
+        let parser = Parser::new();
+        let ast = parser.parse("{0} 'at' {1}");
+        let mut s = String::new();
+        write_format(&mut s, &ast, &["Hello", "World"]);
+        assert_eq!(s, "0 at 1");
+
+        assert_eq!(ast, vec![
+            Element::Placeholder("0"),
+            Element::Literal(Literal { value: " 'at' ", quotes: vec![1, 4] }),
+            Element::Placeholder("1"),
         ]);
     }
 }
