@@ -942,6 +942,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "icu_segmenter"
+version = "0.1.0"
+dependencies = [
+ "icu_locid",
+ "icu_provider",
+]
+
+[[package]]
 name = "icu_segmenter_lstm"
 version = "0.1.0"
 dependencies = [
