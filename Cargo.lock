@@ -763,6 +763,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "iai"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71a816c97c42258aa5834d07590b718b4c9a598944cd39a52dc25b351185d678"
+
+[[package]]
 name = "icu"
 version = "0.1.0"
 dependencies = [
@@ -958,6 +964,7 @@ name = "icu_simple_formatter"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "iai",
 ]
 
 [[package]]

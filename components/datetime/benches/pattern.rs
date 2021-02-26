@@ -26,7 +26,7 @@ fn pattern_benches(c: &mut Criterion) {
             ("Foo {0} and {1}", vec!["Hello", "World"], "Foo Hello and World"),
             ("Foo {1} and {0}", vec!["Hello", "World"], "Foo World and Hello"),
             ("{0}, {1} and {2}", vec!["Start", "Middle", "End"], "Start, Middle and End"),
-            // ("{0} 'at' {1}", vec!["Hello", "World"]),
+            ("{0} 'at' {1}", vec!["Hello", "World"], "Hello at World"),
         ];
 
         group.bench_function("parse_placeholder", |b| {
@@ -34,7 +34,10 @@ fn pattern_benches(c: &mut Criterion) {
                 for sample in &samples {
                     let parser = Parser::new(sample.0);
                     let replacements = sample.1.iter().map(|v| {
-                        Pattern(vec![PatternItem::Literal(v.to_string())])
+                        Pattern { 
+                            items: vec![PatternItem::Literal(v.to_string())],
+                            time_granularity: None,
+                        }
                     }).collect();
                     let result = parser.parse_placeholders(replacements).unwrap();
                     let mut s = String::new();

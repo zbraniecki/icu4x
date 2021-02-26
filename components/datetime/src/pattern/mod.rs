@@ -51,7 +51,7 @@ impl<'p> From<String> for PatternItem {
 /// The granularity of time represented in a pattern item.
 /// Ordered from least granular to most granular for comparsion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) enum TimeGranularity {
+pub enum TimeGranularity {
     Hours,
     Minutes,
     Seconds,
@@ -59,8 +59,8 @@ pub(super) enum TimeGranularity {
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Pattern {
-    items: Vec<PatternItem>,
-    time_granularity: Option<TimeGranularity>,
+    pub items: Vec<PatternItem>,
+    pub time_granularity: Option<TimeGranularity>,
 }
 
 /// Retrieves the granularity of time represented by a `PatternItem`.
