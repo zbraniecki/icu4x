@@ -8,6 +8,7 @@ use icu_simple_formatter::*;
 fn parser(c: &mut Criterion) {
     let samples = vec![
         ("Foo {0} and {1}", vec![vec!["Hello"], vec!["World"]]),
+        ("Foo {1} and {0}", vec![vec!["Hello"], vec!["World"]]),
         (
             "{0}, {1} and {2}",
             vec![vec!["Start"], vec!["Middle"], vec!["End"]],

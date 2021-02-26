@@ -1,5 +1,13 @@
 use std::str::FromStr;
 
+#[derive(Debug)]
+pub enum ParserError<R> {
+    Placeholder(R),
+    UnclosedPlaceholder,
+}
+
+type ParserResult<E, R> = std::result::Result<E, ParserError<R>>;
+
 #[derive(PartialEq, Debug)]
 pub enum Element<'s, P>
 where
@@ -9,10 +17,11 @@ where
     Literal(&'s str),
 }
 
-pub fn parse<P>(input: &str) -> impl Iterator<Item = Element<'_, P>> + '_
+pub fn parse<P>(
+    input: &str,
+) -> impl Iterator<Item = ParserResult<Element<'_, P>, <P as FromStr>::Err>> + '_
 where
     P: FromStr,
-    <P as FromStr>::Err: std::fmt::Debug,
 {
     let mut chars = input.chars().enumerate();
     let mut start_idx = 0;
@@ -25,18 +34,25 @@ where
                 chars.next();
                 in_placeholder = false;
                 start_idx = idx + 2;
-                return Some(Element::Placeholder(ret.parse().unwrap()));
-            }
-            if ch == '{' {
+                match ret.parse() {
+                    Ok(ret) => {
+                        return Some(Ok(Element::Placeholder(ret)));
+                    },
+                    Err(err) => {
+                        return Some(Err(ParserError::Placeholder(err)));
+                    }
+                }
+            } else if ch == '{' {
                 in_placeholder = true;
                 if start_idx != idx {
-                    let r: &str = &input[start_idx..idx];
-                    let ret = Some(Element::Literal(r));
-                    return ret;
+                    return Some(Ok(Element::Literal(&input[start_idx..idx])));
                 } else {
                     continue;
                 }
             }
+        }
+        if in_placeholder {
+            return Some(Err(ParserError::UnclosedPlaceholder));
         }
         None
     })
@@ -72,9 +88,12 @@ impl<'s> ReplacementProvider<'s, usize> for Vec<Vec<Token<'s>>> {
     }
 }
 
-pub fn interpolate<'s, P, F, H>(mut pattern: P, replacements: F) -> impl Iterator<Item = Token<'s>>
+pub fn interpolate<'s, P, F, H>(
+    mut pattern: P,
+    replacements: F,
+) -> impl Iterator<Item = ParserResult<Token<'s>, <H as FromStr>::Err>>
 where
-    P: Iterator<Item = Element<'s, H>>,
+    P: Iterator<Item = ParserResult<Element<'s, H>, <H as FromStr>::Err>>,
     H: FromStr,
     F: ReplacementProvider<'s, H>,
 {
@@ -83,21 +102,29 @@ where
     std::iter::from_fn(move || {
         if let Some(ref mut placeholder) = &mut current_placeholder {
             if let Some(v) = placeholder.next() {
-                return Some(v);
+                return Some(Ok(v));
             } else {
                 current_placeholder = None;
             }
         }
         if let Some(element) = pattern.next() {
             match element {
-                Element::Literal(v) => {
-                    return Some(Token::Literal(v));
+                Ok(Element::Literal(v)) => {
+                    return Some(Ok(Token::Literal(v)));
                 }
-                Element::Placeholder(p) => {
+                Ok(Element::Placeholder(p)) => {
                     let mut r = replacements.get_replacement(p);
                     let ret = r.next();
-                    current_placeholder = Some(r);
-                    return ret;
+                    match ret {
+                        Some(ret) => {
+                            current_placeholder = Some(r);
+                            return Some(Ok(ret));
+                        }
+                        None => return None,
+                    }
+                }
+                Err(err) => {
+                    return Some(Err(err));
                 }
             }
         } else {
@@ -131,9 +158,9 @@ mod tests {
     #[test]
     fn simple_parse() {
         let iter = parse("{0} and {1}");
-        let v: Vec<Element<usize>> = iter.collect();
+        let v: ParserResult<Vec<_>, _> = iter.collect();
         assert_eq!(
-            v,
+            v.unwrap(),
             vec![
                 Element::Placeholder(0),
                 Element::Literal(" and "),
@@ -153,7 +180,16 @@ mod tests {
                 .map(|r| r.iter().map(|t| Token::Literal(t)).collect())
                 .collect();
             let i = interpolate(iter, replacements);
-            let result = i.map(|t| t.to_string()).collect::<Vec<_>>().join("");
+            let result = i
+                .filter_map(|t| {
+                    if let Ok(t) = t {
+                        Some(t.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("");
             assert_eq!(result, sample.2);
         }
     }

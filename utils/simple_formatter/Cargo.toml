@@ -10,7 +10,12 @@ edition = "2018"
 
 [dev-dependencies]
 criterion = "0.3"
+iai = "0.1"
 
 [[bench]]
 name = "parser"
+harness = false
+
+[[bench]]
+name = "parser_iai"
 harness = false
