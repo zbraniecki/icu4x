@@ -1,9 +1,12 @@
+use std::collections::HashMap;
 use std::str::FromStr;
 
 #[derive(Debug)]
 pub enum ParserError<R> {
-    Placeholder(R),
+    InvalidPlaceholder(R),
+    UnknownPlaceholder(String),
     UnclosedPlaceholder,
+    UnclosedLiteral,
 }
 
 type ParserResult<E, R> = std::result::Result<E, ParserError<R>>;
@@ -11,50 +14,83 @@ type ParserResult<E, R> = std::result::Result<E, ParserError<R>>;
 #[derive(PartialEq, Debug)]
 pub enum Element<'s, P>
 where
-    P: FromStr,
+    P: FromStr + std::fmt::Display,
 {
     Placeholder(P),
     Literal(&'s str),
+}
+
+#[derive(PartialEq)]
+enum ParserState {
+    Default,
+    Placeholder,
+    QuotedLiteral,
 }
 
 pub fn parse<P>(
     input: &str,
 ) -> impl Iterator<Item = ParserResult<Element<'_, P>, <P as FromStr>::Err>> + '_
 where
-    P: FromStr,
+    P: FromStr + std::fmt::Display,
 {
     let mut chars = input.chars().enumerate();
     let mut start_idx = 0;
-    let mut in_placeholder = false;
+    let mut state = ParserState::Default;
 
     std::iter::from_fn(move || {
         while let Some((idx, ch)) = chars.next() {
-            if in_placeholder {
-                let ret = &input[idx..idx + 1];
-                chars.next();
-                in_placeholder = false;
-                start_idx = idx + 2;
-                match ret.parse() {
-                    Ok(ret) => {
-                        return Some(Ok(Element::Placeholder(ret)));
-                    },
-                    Err(err) => {
-                        return Some(Err(ParserError::Placeholder(err)));
+            match state {
+                ParserState::Placeholder if ch == '}' => {
+                    state = ParserState::Default;
+                    let range = start_idx..idx;
+                    start_idx = idx + 1;
+                    match (&input[range]).parse() {
+                        Ok(ret) => {
+                            return Some(Ok(Element::Placeholder(ret)));
+                        }
+                        Err(err) => {
+                            return Some(Err(ParserError::InvalidPlaceholder(err)));
+                        }
                     }
                 }
-            } else if ch == '{' {
-                in_placeholder = true;
-                if start_idx != idx {
-                    return Some(Ok(Element::Literal(&input[start_idx..idx])));
-                } else {
-                    continue;
+                ParserState::QuotedLiteral if ch == '\'' => {
+                    state = ParserState::Default;
+                    let range = start_idx..idx;
+                    start_idx = idx + 1;
+                    if !range.is_empty() {
+                        return Some(Ok(Element::Literal(&input[range])));
+                    } else {
+                        continue;
+                    }
                 }
+                ParserState::Default if ch == '{' => {
+                    state = ParserState::Placeholder;
+                    let range = start_idx..idx;
+                    start_idx = idx + 1;
+                    if !range.is_empty() {
+                        return Some(Ok(Element::Literal(&input[range])));
+                    } else {
+                        continue;
+                    }
+                }
+                ParserState::Default if ch == '\'' => {
+                    state = ParserState::QuotedLiteral;
+                    let range = start_idx..idx;
+                    start_idx = idx + 1;
+                    if start_idx != idx {
+                        return Some(Ok(Element::Literal(&input[range])));
+                    } else {
+                        continue;
+                    }
+                }
+                _ => {}
             }
         }
-        if in_placeholder {
-            return Some(Err(ParserError::UnclosedPlaceholder));
+        match state {
+            ParserState::Placeholder => Some(Err(ParserError::UnclosedPlaceholder)),
+            ParserState::QuotedLiteral => Some(Err(ParserError::UnclosedLiteral)),
+            ParserState::Default => None,
         }
-        None
     })
 }
 
@@ -71,20 +107,25 @@ impl<'s> std::fmt::Display for Token<'s> {
     }
 }
 
-pub trait ReplacementProvider<'s, H>
-where
-    H: FromStr,
-{
+pub trait ReplacementProvider<'s, H> {
     type Iter: Iterator<Item = Token<'s>>;
 
-    fn get_replacement(&self, input: H) -> Self::Iter;
+    fn get_replacement(&self, input: &H) -> Option<Self::Iter>;
 }
 
 impl<'s> ReplacementProvider<'s, usize> for Vec<Vec<Token<'s>>> {
     type Iter = <Vec<Token<'s>> as IntoIterator>::IntoIter;
 
-    fn get_replacement(&self, input: usize) -> Self::Iter {
-        self.get(input).unwrap().clone().into_iter()
+    fn get_replacement(&self, input: &usize) -> Option<Self::Iter> {
+        self.get(*input).map(|r| r.clone().into_iter())
+    }
+}
+
+impl<'s> ReplacementProvider<'s, String> for HashMap<String, Vec<Token<'s>>> {
+    type Iter = <Vec<Token<'s>> as IntoIterator>::IntoIter;
+
+    fn get_replacement(&self, input: &String) -> Option<Self::Iter> {
+        self.get(input).map(|r| r.clone().into_iter())
     }
 }
 
@@ -94,7 +135,7 @@ pub fn interpolate<'s, P, F, H>(
 ) -> impl Iterator<Item = ParserResult<Token<'s>, <H as FromStr>::Err>>
 where
     P: Iterator<Item = ParserResult<Element<'s, H>, <H as FromStr>::Err>>,
-    H: FromStr,
+    H: FromStr + std::fmt::Display,
     F: ReplacementProvider<'s, H>,
 {
     let mut current_placeholder: Option<F::Iter> = None;
@@ -113,14 +154,17 @@ where
                     return Some(Ok(Token::Literal(v)));
                 }
                 Ok(Element::Placeholder(p)) => {
-                    let mut r = replacements.get_replacement(p);
-                    let ret = r.next();
-                    match ret {
-                        Some(ret) => {
-                            current_placeholder = Some(r);
-                            return Some(Ok(ret));
+                    if let Some(mut r) = replacements.get_replacement(&p) {
+                        let ret = r.next();
+                        match ret {
+                            Some(ret) => {
+                                current_placeholder = Some(r);
+                                return Some(Ok(ret));
+                            }
+                            None => return None,
                         }
-                        None => return None,
+                    } else {
+                        return Some(Err(ParserError::UnknownPlaceholder(p.to_string())));
                     }
                 }
                 Err(err) => {
@@ -136,6 +180,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fmt::Write;
 
     const samples: &[(&str, &[&[&str]], &str)] = &[
         (
@@ -148,11 +193,7 @@ mod tests {
             &[&["Start"], &["Middle"], &["End"]],
             "Start, Middle and End",
         ),
-        (
-            "{0} 'at' {1}",
-            &[&["Hello"], &["World"]],
-            "Hello 'at' World",
-        ),
+        ("{0} 'at' {1}", &[&["Hello"], &["World"]], "Hello at World"),
     ];
 
     #[test]
@@ -179,18 +220,55 @@ mod tests {
                 .iter()
                 .map(|r| r.iter().map(|t| Token::Literal(t)).collect())
                 .collect();
-            let i = interpolate(iter, replacements);
+            let mut i = interpolate(iter, replacements);
             let result = i
-                .filter_map(|t| {
-                    if let Ok(t) = t {
-                        Some(t.to_string())
+                .try_fold(String::new(), |mut acc, t| {
+                    if t.map(|t| write!(acc, "{}", t)).is_err() {
+                        Err(())
                     } else {
-                        None
+                        Ok(acc)
                     }
                 })
-                .collect::<Vec<_>>()
-                .join("");
+                .unwrap();
             assert_eq!(result, sample.2);
         }
     }
+
+    #[test]
+    fn named_interpolate() {
+        let iter = parse("{start}, {middle} and {end}");
+
+        let replacements: std::collections::HashMap<String, Vec<Token>> =
+            vec![
+                ("start", vec!["Hello"]),
+                ("middle", vec!["Middle"]),
+                ("end", vec!["World"])
+            ]
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.iter().map(|t| Token::Literal(t)).collect()))
+            .collect();
+        let mut i = interpolate(iter, replacements);
+
+        let result = i
+            .try_fold(String::new(), |mut acc, t| {
+                if t.map(|t| write!(acc, "{}", t)).is_err() {
+                    Err(())
+                } else {
+                    Ok(acc)
+                }
+            })
+            .unwrap();
+        assert_eq!(result, "Hello, Middle and World");
+    }
+
+    #[test]
+    fn placeholder_parse_err() {
+        let iter = parse::<usize>("{0} and {end}");
+        let v: ParserResult<Vec<_>, _> = iter.collect();
+        assert_eq!(
+            v.is_err(),
+            true
+        );
+    }
+
 }
