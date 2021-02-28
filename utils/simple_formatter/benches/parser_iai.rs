@@ -1,6 +1,15 @@
 use icu_simple_formatter::*;
 use std::fmt::Write;
 
+#[derive(Debug)]
+struct Token;
+
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 fn iai_parse() {
     let samples = vec![
         ("Foo {0} and {1}", vec![vec!["Hello"], vec!["World"]]),
@@ -32,10 +41,10 @@ fn iai_interpolate() {
     for sample in &samples {
         let iter = parse::<usize>(sample.0);
 
-        let replacements: Vec<Vec<Token>> = sample
+        let replacements: Vec<Vec<Element<Token>>> = sample
             .1
             .iter()
-            .map(|r| r.iter().map(|t| Token::Literal(t)).collect())
+            .map(|r| r.iter().map(|t| Element::Literal(t)).collect())
             .collect();
 
         let mut i = interpolate(iter, replacements);
@@ -64,10 +73,15 @@ fn iai_named_interpolate() {
     for sample in &named_samples {
         let iter = parse::<String>(sample.0);
 
-        let replacements: std::collections::HashMap<String, Vec<Token>> = sample
+        let replacements: std::collections::HashMap<String, Vec<Element<Token>>> = sample
             .1
             .iter()
-            .map(|(k, v)| (k.to_string(), v.iter().map(|t| Token::Literal(t)).collect()))
+            .map(|(k, v)| {
+                (
+                    k.to_string(),
+                    v.iter().map(|t| Element::Literal(t)).collect(),
+                )
+            })
             .collect();
 
         let _ = interpolate(iter, replacements).count();

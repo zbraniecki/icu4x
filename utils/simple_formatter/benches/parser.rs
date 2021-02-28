@@ -5,6 +5,15 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use icu_simple_formatter::*;
 
+#[derive(Debug)]
+struct Token;
+
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 fn parser(c: &mut Criterion) {
     let samples = vec![
         ("Foo {0} and {1}", vec![vec!["Hello"], vec!["World"]]),
@@ -30,10 +39,10 @@ fn parser(c: &mut Criterion) {
             for sample in &samples {
                 let iter = parse(sample.0);
 
-                let replacements: Vec<Vec<Token>> = sample
+                let replacements: Vec<Vec<Element<Token>>> = sample
                     .1
                     .iter()
-                    .map(|r| r.iter().map(|t| Token::Literal(t)).collect())
+                    .map(|r| r.iter().map(|t| Element::Literal(t)).collect())
                     .collect();
                 let i = interpolate(iter, replacements).count();
             }
