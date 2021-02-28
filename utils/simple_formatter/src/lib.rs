@@ -109,19 +109,6 @@ where
     })
 }
 
-// #[derive(PartialEq, Debug, Clone)]
-// pub enum Token<'s> {
-//     Literal(&'s str),
-// }
-
-// impl<'s> std::fmt::Display for Token<'s> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             Self::Literal(s) => f.write_str(s),
-//         }
-//     }
-// }
-
 pub trait ReplacementProvider<'s, P, T> {
     fn take_replacement(&mut self, key: &P) -> Option<Option<Element<'s, T>>>;
 }
@@ -149,15 +136,16 @@ impl<'s, T> ReplacementProvider<'s, String, T> for HashMap<String, Vec<Element<'
 }
 
 pub fn interpolate<'s, I, R, P, T>(
-    mut pattern: I,
+    pattern: I,
     mut replacements: R,
 ) -> impl Iterator<Item = ParserResult<Element<'s, T>, <P as FromStr>::Err>>
 where
-    I: Iterator<Item = ParserResult<PlaceholderElement<'s, P>, <P as FromStr>::Err>>,
+    I: IntoIterator<Item = ParserResult<PlaceholderElement<'s, P>, <P as FromStr>::Err>>,
     P: FromStr + std::fmt::Display,
     R: ReplacementProvider<'s, P, T>,
 {
     let mut current_placeholder = None;
+    let mut pattern = pattern.into_iter();
 
     std::iter::from_fn(move || {
         if let Some(ref placeholder) = &mut current_placeholder {
@@ -313,6 +301,19 @@ mod tests {
             Minute,
         }
 
+        impl std::fmt::Display for Token {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let ch = match self {
+                    Self::Year => 'Y',
+                    Self::Month => 'M',
+                    Self::Day => 'd',
+                    Self::Hour => 'H',
+                    Self::Minute => 'm',
+                };
+                f.write_char(ch)
+            }
+        }
+
         let date: Vec<Element<Token>> = vec![
             Element::Token(Token::Year),
             Element::Literal("-"),
@@ -335,7 +336,11 @@ mod tests {
 
         let iter = parse::<String>(placeholder);
 
-        let i = interpolate(iter, replacements);
-        println!("{:#?}", i.collect::<Vec<_>>());
+        // let s: String = interpolate(iter, replacements).filter_map(|e| {
+        //     match e.unwrap() {
+        //         Element::Literal(l) => Some(l),
+        //         Element::Token(t) => Some(&t.to_string())
+        //     }
+        // }).collect();
     }
 }

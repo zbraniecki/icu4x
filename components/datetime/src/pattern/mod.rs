@@ -93,6 +93,28 @@ impl Pattern {
             .map(Pattern::from)
     }
 
+    pub fn from_bytes_combination2(input: &str, date: Self, time: Self) -> Result<Self, Error> {
+        use icu_simple_formatter::*;
+        let p = parse::<usize>(input);
+        let date: Vec<Element<PatternItem>> = date.items.into_iter().map(|pi| {
+            Element::Token(pi)
+        }).collect();
+        let time: Vec<Element<PatternItem>> = time.items.into_iter().map(|pi| {
+            Element::Token(pi)
+        }).collect();
+        let replacements = vec![
+            time, date
+        ];
+        let i = interpolate(p, replacements);
+        let pi: Vec<PatternItem> = i.map(|e| {
+            match e.unwrap() {
+                Element::Token(pi) => pi,
+                Element::Literal(l) => PatternItem::Literal(l.to_string()),
+            }
+        }).collect();
+        Ok(Pattern::from(pi))
+    }
+
     pub(super) fn most_granular_time(&self) -> Option<TimeGranularity> {
         self.time_granularity
     }

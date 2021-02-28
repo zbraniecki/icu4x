@@ -53,7 +53,6 @@ fn pattern_benches(c: &mut Criterion) {
 
         group.bench_function("parse_placeholder2", |b| {
             use icu_simple_formatter::*;
-            use std::fmt::Write;
 
             #[derive(Debug)]
             struct Token;
@@ -70,17 +69,15 @@ fn pattern_benches(c: &mut Criterion) {
                     let replacements: Vec<Vec<Element<Token>>> = sample.1.iter().map(|v| {
                         vec![Element::Literal(v)]
                     }).collect();
-                    let mut i = interpolate(p, replacements);
-                    let result = i
-                        .try_fold(String::new(), |mut acc, t| {
-                            if t.map(|t| write!(acc, "{}", t)).is_err() {
-                                Err(())
-                            } else {
-                                Ok(acc)
-                            }
-                        })
-                        .unwrap();
-                    assert_eq!(result, sample.2);
+
+                    let s: String = interpolate(p, replacements).filter_map(|e| {
+                        if let Element::Literal(l) = e.unwrap() {
+                            Some(l)
+                        } else {
+                            None
+                        }
+                    }).collect();
+                    assert_eq!(s, sample.2);
                 }
             })
         });
