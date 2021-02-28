@@ -51,6 +51,40 @@ fn pattern_benches(c: &mut Criterion) {
             })
         });
 
+        group.bench_function("parse_placeholder2", |b| {
+            use icu_simple_formatter::*;
+            use std::fmt::Write;
+
+            #[derive(Debug)]
+            struct Token;
+
+            impl std::fmt::Display for Token {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{:?}", self)
+                }
+            }
+
+            b.iter(|| {
+                for sample in &samples {
+                    let p = parse::<usize>(sample.0);
+                    let replacements: Vec<Vec<Element<Token>>> = sample.1.iter().map(|v| {
+                        vec![Element::Literal(v)]
+                    }).collect();
+                    let mut i = interpolate(p, replacements);
+                    let result = i
+                        .try_fold(String::new(), |mut acc, t| {
+                            if t.map(|t| write!(acc, "{}", t)).is_err() {
+                                Err(())
+                            } else {
+                                Ok(acc)
+                            }
+                        })
+                        .unwrap();
+                    assert_eq!(result, sample.2);
+                }
+            })
+        });
+
         group.finish();
     }
 }

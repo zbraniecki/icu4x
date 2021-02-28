@@ -823,6 +823,7 @@ dependencies = [
  "icu_locid",
  "icu_locid_macros",
  "icu_provider",
+ "icu_simple_formatter",
  "icu_testdata",
  "serde",
  "serde_json",
