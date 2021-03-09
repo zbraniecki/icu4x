@@ -1,0 +1,281 @@
+diff --git a/components/datetime/src/pattern/parser.rs b/components/datetime/src/pattern/parser.rs
+index 82985fc..66ad7e9 100644
+--- a/components/datetime/src/pattern/parser.rs
++++ b/components/datetime/src/pattern/parser.rs
+@@ -9,7 +9,7 @@ use std::convert::{TryFrom, TryInto};
+ use std::ops::Range;
+ // use std::iter::{Enumerate, Peekable};
+ 
+-#[derive(Debug)]
++#[derive(Debug, PartialEq)]
+ enum ParserState {
+     Literal,
+     QuotedLiteral,
+@@ -35,15 +35,14 @@ enum ParserState {
+ // }
+ 
+ pub trait Slice<'p> {
+-    fn get(&self, idx: usize) -> Option<&u8>;
++    fn get(&self, idx: usize) -> Option<u8>;
+     fn get_slice(&self, range: Range<usize>) -> Cow<'p, str>;
+-    fn get_bytes(&self) -> &[u8];
+     fn length(&self) -> usize;
+ }
+ 
+ impl<'p> Slice<'p> for Cow<'p, str> {
+-    fn get(&self, idx: usize) -> Option<&u8> {
+-        self.as_bytes().get(idx)
++    fn get(&self, idx: usize) -> Option<u8> {
++        self.as_bytes().get(idx).copied()
+     }
+ 
+     fn get_slice(&self, range: Range<usize>) -> Cow<'p, str> {
+@@ -53,28 +52,20 @@ impl<'p> Slice<'p> for Cow<'p, str> {
+         }
+     }
+ 
+-    fn get_bytes(&self) -> &[u8] {
+-        self.as_bytes()
+-    }
+-
+     fn length(&self) -> usize {
+         self.len()
+     }
+ }
+ 
+ impl<'p> Slice<'p> for &'p str {
+-    fn get(&self, idx: usize) -> Option<&u8> {
+-        self.as_bytes().get(idx)
++    fn get(&self, idx: usize) -> Option<u8> {
++        self.as_bytes().get(idx).copied()
+     }
+ 
+     fn get_slice(&self, range: Range<usize>) -> Cow<'p, str> {
+         Cow::Borrowed(&self[range])
+     }
+ 
+-    fn get_bytes(&self) -> &[u8] {
+-        self.as_bytes()
+-    }
+-
+     fn length(&self) -> usize {
+         self.len()
+     }
+@@ -84,16 +75,20 @@ pub struct Parser<'p,'s, S> {
+     input: &'s S,
+     start_idx: usize,
+     idx: usize,
++    len: usize,
+     state: ParserState,
+     marker: std::marker::PhantomData<&'p S>,
+ }
+ 
+ impl<'p, 's, S> Parser<'p, 's, S> {
+-    pub fn new(input: &'s S) -> Self {
++    pub fn new(input: &'s S) -> Self
++    where S: Slice<'p> {
++        let len = input.length();
+         Self {
+             input,
+             start_idx: 0,
+             idx: 0,
++            len,
+             state: ParserState::Literal,
+             marker: std::marker::PhantomData,
+         }
+@@ -112,6 +107,9 @@ where
+             "next: {:?}, idx: {}, start_idx: {}",
+             self.state, self.idx, self.start_idx
+         );
++        if self.start_idx == self.len {
++            return None;
++        }
+         while let Some(b) = self.input.get(self.idx) {
+             #[cfg(debug_assertions)]
+             println!(
+@@ -125,37 +123,22 @@ where
+                     } else {
+                         ParserState::Literal
+                     };
+-                    let range = self.start_idx..self.start_idx + 1;
+-                    self.start_idx += 1;
+                     self.idx += 1;
++                    let range = self.start_idx..self.idx;
++                    self.start_idx = self.idx;
+                     return Some(Ok(PatternItem::Literal(self.input.get_slice(range))));
+                 }
+-                ParserState::Literal => {
+-                    if b.is_ascii_alphabetic() {
+-                        if let Ok(symbol) = FieldSymbol::try_from(*b) {
+-                            let range = self.start_idx..self.idx;
+-                            self.state = ParserState::Token {
+-                                symbol,
+-                                literal: *b,
+-                            };
+-                            self.start_idx = self.idx;
+-                            if !range.is_empty() {
+-                                return Some(Ok(PatternItem::Literal(self.input.get_slice(range))));
+-                            }
+-                        } else {
+-                            return Some(Err(Error::UnknownField('X')));
+-                        }
+-                    } else if b == &b'\'' {
++                ParserState::QuotedLiteral => {
++                    if b == b'\'' {
+                         let range = self.start_idx..self.idx;
+ 
+                         self.idx += 1;
++                        self.start_idx = self.idx;
+ 
+                         self.state = if let Some(b'\'') = self.input.get(self.idx) {
+-                            self.start_idx = self.idx;
+-                            ParserState::Apostrophe { quoted: false }
++                            ParserState::Apostrophe { quoted: true }
+                         } else {
+-                            self.start_idx = self.idx;
+-                            ParserState::QuotedLiteral
++                            ParserState::Literal
+                         };
+ 
+                         if !range.is_empty() {
+@@ -165,17 +148,32 @@ where
+                         self.idx += 1;
+                     }
+                 }
+-                ParserState::QuotedLiteral => {
+-                    if b == &b'\'' {
++                ParserState::Literal => {
++                    if b.is_ascii_alphabetic() {
++                        if let Ok(symbol) = FieldSymbol::try_from(b) {
++                            let range = self.start_idx..self.idx;
++                            self.state = ParserState::Token {
++                                symbol,
++                                literal: b,
++                            };
++                            self.start_idx = self.idx;
++                            self.idx += 1;
++                            if !range.is_empty() {
++                                return Some(Ok(PatternItem::Literal(self.input.get_slice(range))));
++                            }
++                        } else {
++                            return Some(Err(Error::UnknownField(b as char)));
++                        }
++                    } else if b == b'\'' {
+                         let range = self.start_idx..self.idx;
++
+                         self.idx += 1;
++                        self.start_idx = self.idx;
+ 
+-                        self.state = if let Some(b'\'') = self.input.get(self.idx) {
+-                            self.start_idx = self.idx;
+-                            ParserState::Apostrophe { quoted: true }
+-                        } else {
+-                            self.start_idx = self.idx;
+-                            ParserState::Literal
++                        self.state = match self.input.get(self.idx) {
++                            Some(b'\'') => ParserState::Apostrophe { quoted: false },
++                            Some(_) => ParserState::QuotedLiteral,
++                            None => return Some(Err(Error::UnclosedLiteral)),
+                         };
+ 
+                         if !range.is_empty() {
+@@ -185,15 +183,11 @@ where
+                         self.idx += 1;
+                     }
+                 }
+-                ParserState::Token { symbol, literal } if literal != *b => {
++                ParserState::Token { symbol, literal } if literal != b => {
+                     let length = self.idx - self.start_idx;
+                     self.start_idx = self.idx;
+                     self.state = ParserState::Literal;
+-                    if let Ok(pi) = (symbol, length).try_into() {
+-                        return Some(Ok(pi));
+-                    } else {
+-                        return Some(Err(Error::FieldTooLong(symbol)));
+-                    }
++                    return Some((symbol, length).try_into().map_err(Into::into));
+                 }
+                 _ => {
+                     self.idx += 1;
+@@ -202,34 +196,24 @@ where
+         }
+         #[cfg(debug_assertions)]
+         println!("end: {:?}, start_idx: {}", self.state, self.start_idx);
+-        let len = self.input.length();
++        let range = self.start_idx..self.len;
++        self.start_idx = self.len;
+         match self.state {
+-            ParserState::Literal | ParserState::QuotedLiteral => {
+-                self.state = ParserState::Literal;
+-                if self.start_idx < len {
+-                    let range = self.start_idx..len;
+-                    self.start_idx = len;
+-                    return Some(Ok(PatternItem::Literal(self.input.get_slice(range))));
+-                } else {
+-                    self.start_idx = len;
+-                    return None;
+-                }
+-            }
+-            ParserState::Apostrophe { .. } => {
+-                let range = len - 1..len;
+-                self.start_idx = len;
+-                self.state = ParserState::Literal;
++            ParserState::Literal if range.is_empty() => {
++                return None;
++            },
++            ParserState::Literal => {
+                 return Some(Ok(PatternItem::Literal(self.input.get_slice(range))));
+-            }
++            },
+             ParserState::Token { symbol, .. } => {
+-                let length = len - self.start_idx;
+-                self.start_idx = len;
+-                self.state = ParserState::Literal;
+-                if let Ok(pi) = (symbol, length).try_into() {
+-                    return Some(Ok(pi));
+-                } else {
+-                    return Some(Err(Error::FieldTooLong(symbol)));
+-                }
++                let length = range.end - range.start;
++                return Some((symbol, length).try_into().map_err(Into::into));
++            }
++            ParserState::QuotedLiteral => {
++                return Some(Err(Error::UnclosedLiteral));
++            }
++            ParserState::Apostrophe { .. } => {
++                unreachable!();
+             }
+         }
+     }
+@@ -408,7 +392,7 @@ mod tests {
+ 
+     #[test]
+     fn pattern_parse_perf() {
+-        let samples = vec!["dd/MM/y"];
++        let samples = vec!["' '"];
+ 
+         for string in samples {
+             parse(&string.into())
+@@ -531,13 +515,16 @@ mod tests {
+             // );
+         }
+ 
+-        // let broken = vec![(" 'foo ", Error::UnclosedLiteral)];
++        let broken = vec![
++            (" 'foo ", Error::UnclosedLiteral),
++            (" '", Error::UnclosedLiteral),
++        ];
+ 
+-        // for (string, error) in broken {
+-        //     assert!(parse(string)
+-        //         .collect::<Result<Vec<PatternItem>, _>>()
+-        //         .is_err(),);
+-        // }
++        for (string, error) in broken {
++            assert!(Parser::new(&string)
++                .collect::<Result<Vec<PatternItem>, _>>()
++                .is_err(),);
++        }
+     }
+ 
+     #[test]

@@ -45,7 +45,7 @@ pub struct FormattedDateTime<'l, T>
 where
     T: DateTimeInput,
 {
-    pub(crate) pattern: &'l Pattern,
+    pub(crate) pattern: &'l Pattern<'l>,
     pub(crate) symbols: &'l provider::gregory::DateSymbolsV1,
     pub(crate) date_time: &'l T,
     pub(crate) locale: &'l Locale,
@@ -246,6 +246,11 @@ where
             );
             w.write_str(symbol)?
         }
+        FieldSymbol::Unknown(literal) => {
+            for _ in 0..field.length as u8 {
+                w.write_char(literal)?
+            }
+        }
     };
     Ok(())
 }
@@ -275,7 +280,7 @@ mod tests {
             .unwrap()
             .take_payload()
             .unwrap();
-        let pattern = crate::pattern::Pattern::from_bytes("MMM").unwrap();
+        let pattern = crate::pattern::Pattern::from_bytes(&"MMM".into()).unwrap();
         let date_time = MockDateTime::try_new(2020, 8, 1, 12, 34, 28).unwrap();
         let mut sink = String::new();
         write_pattern(

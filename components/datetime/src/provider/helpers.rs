@@ -13,16 +13,19 @@ use std::borrow::Cow;
 type Result<T> = std::result::Result<T, DateTimeFormatError>;
 
 pub trait DateTimePatterns {
-    fn get_pattern_for_options(&self, options: &DateTimeFormatOptions) -> Result<Option<Pattern>>;
-    fn get_pattern_for_style_bag(&self, style: &style::Bag) -> Result<Option<Pattern>>;
-    fn get_pattern_for_date_style(&self, style: style::Date) -> Result<Pattern>;
-    fn get_pattern_for_time_style(&self, style: style::Time) -> Result<Pattern>;
-    fn get_pattern_for_date_time_style(
+    fn get_pattern_for_options<'d>(
+        &self,
+        options: &DateTimeFormatOptions,
+    ) -> Result<Option<Pattern<'d>>>;
+    fn get_pattern_for_style_bag<'d>(&self, style: &style::Bag) -> Result<Option<Pattern<'d>>>;
+    fn get_pattern_for_date_style<'d>(&self, style: style::Date) -> Result<Pattern<'d>>;
+    fn get_pattern_for_time_style<'d>(&self, style: style::Time) -> Result<Pattern<'d>>;
+    fn get_pattern_for_date_time_style<'d>(
         &self,
         style: style::Date,
-        date: Pattern,
-        time: Pattern,
-    ) -> Result<Pattern>;
+        date: Pattern<'d>,
+        time: Pattern<'d>,
+    ) -> Result<Pattern<'d>>;
 }
 
 pub trait DateTimeSymbols {
@@ -48,14 +51,17 @@ pub trait DateTimeSymbols {
 }
 
 impl DateTimePatterns for provider::gregory::PatternsV1 {
-    fn get_pattern_for_options(&self, options: &DateTimeFormatOptions) -> Result<Option<Pattern>> {
+    fn get_pattern_for_options<'d>(
+        &self,
+        options: &DateTimeFormatOptions,
+    ) -> Result<Option<Pattern<'d>>> {
         match options {
             DateTimeFormatOptions::Style(bag) => self.get_pattern_for_style_bag(bag),
             DateTimeFormatOptions::Components(_) => unimplemented!(),
         }
     }
 
-    fn get_pattern_for_style_bag(&self, style: &style::Bag) -> Result<Option<Pattern>> {
+    fn get_pattern_for_style_bag<'d>(&self, style: &style::Bag) -> Result<Option<Pattern<'d>>> {
         match (style.date, style.time) {
             (None, None) => Ok(None),
             (None, Some(time_style)) => self.get_pattern_for_time_style(time_style).map(Some),
@@ -70,7 +76,7 @@ impl DateTimePatterns for provider::gregory::PatternsV1 {
         }
     }
 
-    fn get_pattern_for_date_style(&self, style: style::Date) -> Result<Pattern> {
+    fn get_pattern_for_date_style<'d>(&self, style: style::Date) -> Result<Pattern<'d>> {
         let date = &self.date;
         let s = match style {
             style::Date::Full => &date.full,
@@ -81,12 +87,12 @@ impl DateTimePatterns for provider::gregory::PatternsV1 {
         Ok(Pattern::from_bytes(s)?)
     }
 
-    fn get_pattern_for_date_time_style(
+    fn get_pattern_for_date_time_style<'d>(
         &self,
         style: style::Date,
-        date: Pattern,
-        time: Pattern,
-    ) -> Result<Pattern> {
+        date: Pattern<'d>,
+        time: Pattern<'d>,
+    ) -> Result<Pattern<'d>> {
         let date_time = &self.date_time;
         let s = match style {
             style::Date::Full => &date_time.full,
@@ -97,7 +103,7 @@ impl DateTimePatterns for provider::gregory::PatternsV1 {
         Ok(Pattern::from_bytes_combination(s, date, time)?)
     }
 
-    fn get_pattern_for_time_style(&self, style: style::Time) -> Result<Pattern> {
+    fn get_pattern_for_time_style<'d>(&self, style: style::Time) -> Result<Pattern<'d>> {
         let time = &self.time;
         let s = match style {
             style::Time::Full => &time.full,

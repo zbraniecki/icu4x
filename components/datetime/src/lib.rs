@@ -135,7 +135,7 @@ use std::borrow::Cow;
 /// asynchronous `DataProvider` and corresponding asynchronous constructor.
 pub struct DateTimeFormat<'d> {
     locale: Locale,
-    pattern: Pattern,
+    pattern: Pattern<'d>,
     symbols: Cow<'d, provider::gregory::DateSymbolsV1>,
 }
 
@@ -180,15 +180,14 @@ impl<'d> DateTimeFormat<'d> {
             })?
             .take_payload()?;
 
-        let pattern = data
-            .patterns
+        let (symbols, patterns) = match data {
+            Cow::Borrowed(data) => (Cow::Borrowed(&data.symbols), Cow::Borrowed(&data.patterns)),
+            Cow::Owned(data) => (Cow::Owned(data.symbols), Cow::Owned(data.patterns)),
+        };
+
+        let pattern = patterns
             .get_pattern_for_options(options)?
             .unwrap_or_default();
-
-        let symbols = match data {
-            Cow::Borrowed(data) => Cow::Borrowed(&data.symbols),
-            Cow::Owned(data) => Cow::Owned(data.symbols),
-        };
 
         Ok(Self {
             locale,

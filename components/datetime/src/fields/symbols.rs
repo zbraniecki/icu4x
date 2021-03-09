@@ -21,6 +21,7 @@ pub enum FieldSymbol {
     Hour(Hour),
     Minute,
     Second(Second),
+    Unknown(char),
 }
 
 impl TryFrom<u8> for FieldSymbol {
@@ -35,7 +36,14 @@ impl TryFrom<u8> for FieldSymbol {
                 .or_else(|_| Weekday::try_from(b).map(Self::Weekday))
                 .or_else(|_| DayPeriod::try_from(b).map(Self::DayPeriod))
                 .or_else(|_| Hour::try_from(b).map(Self::Hour))
-                .or_else(|_| Second::try_from(b).map(Self::Second)),
+                .or_else(|_| Second::try_from(b).map(Self::Second))
+                .or_else(|_| {
+                    if b.is_ascii_alphabetic() {
+                        Ok(Self::Unknown(b as char))
+                    } else {
+                        Err(SymbolError::Unknown(b))
+                    }
+                }),
         }
     }
 }

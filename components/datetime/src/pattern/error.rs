@@ -9,6 +9,7 @@ pub enum Error {
     UnknownSubstitution(char),
     UnclosedLiteral,
     UnclosedPlaceholder,
+    UnknownField(char),
 }
 
 impl From<fields::Error> for Error {

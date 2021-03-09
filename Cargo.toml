@@ -25,6 +25,9 @@ members = [
     "utils/fixed_decimal",
     "utils/litemap",
     "utils/writeable",
+    "utils/simple_formatter",
+    "utils/pattern",
+    "utils/string",
 ]
 
 # Enable lto for WASM.
