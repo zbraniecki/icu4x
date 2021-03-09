@@ -2,48 +2,24 @@
 // called LICENSE at the top level of the ICU4X source tree
 // (online at: https://github.com/unicode-org/icu4x/blob/main/LICENSE ).
 mod error;
-mod parser;
+pub mod parser;
 
 use crate::fields::{self, Field, FieldLength, FieldSymbol};
 pub use error::Error;
+use icu_simple_formatter::{interpolate, parse, Element};
+use icu_string::Slice;
 use parser::Parser;
-use std::convert::TryFrom;
+use std::borrow::Cow;
 use std::iter::FromIterator;
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum PatternItem {
+#[derive(Debug, Clone, PartialEq)]
+pub enum PatternItem<'p> {
     Field(fields::Field),
-    Literal(String),
+    Literal(Cow<'p, str>),
 }
 
-impl From<(FieldSymbol, FieldLength)> for PatternItem {
-    fn from(input: (FieldSymbol, FieldLength)) -> Self {
-        Self::Field(Field {
-            symbol: input.0,
-            length: input.1,
-        })
-    }
-}
-
-impl TryFrom<(FieldSymbol, u8)> for PatternItem {
-    type Error = Error;
-    fn try_from(input: (FieldSymbol, u8)) -> Result<Self, Self::Error> {
-        let length = FieldLength::try_from(input.1).map_err(|_| Error::FieldTooLong(input.0))?;
-        Ok(Self::Field(Field {
-            symbol: input.0,
-            length,
-        }))
-    }
-}
-
-impl<'p> From<&str> for PatternItem {
-    fn from(input: &str) -> Self {
-        Self::Literal(input.into())
-    }
-}
-
-impl<'p> From<String> for PatternItem {
-    fn from(input: String) -> Self {
+impl<'p> From<Cow<'p, str>> for PatternItem<'p> {
+    fn from(input: Cow<'p, str>) -> Self {
         Self::Literal(input)
     }
 }
@@ -58,8 +34,8 @@ pub(super) enum TimeGranularity {
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
-pub struct Pattern {
-    items: Vec<PatternItem>,
+pub struct Pattern<'p> {
+    pub items: Vec<PatternItem<'p>>,
     time_granularity: Option<TimeGranularity>,
 }
 
@@ -77,20 +53,35 @@ fn get_time_granularity(item: &PatternItem) -> Option<TimeGranularity> {
     }
 }
 
-impl Pattern {
+impl<'p> Pattern<'p> {
     pub fn items(&self) -> &[PatternItem] {
         &self.items
     }
 
-    pub fn from_bytes(input: &str) -> Result<Self, Error> {
-        Parser::new(input).parse().map(Pattern::from)
+    pub fn from_bytes(input: &Cow<'p, str>) -> Result<Self, Error> {
+        let mut items = vec![];
+        let mut parser = Parser::new(input);
+        while let Some(item) = parser.next()? {
+            items.push(item);
+        }
+
+        Ok(Self {
+            time_granularity: None,
+            items,
+        })
     }
 
     // TODO(#277): This should be turned into a utility for all ICU4X.
-    pub fn from_bytes_combination(input: &str, date: Self, time: Self) -> Result<Self, Error> {
-        Parser::new(input)
-            .parse_placeholders(vec![time, date])
-            .map(Pattern::from)
+    pub fn from_bytes_combination(
+        input: &Cow<'p, str>,
+        date: Self,
+        time: Self,
+    ) -> Result<Self, Error> {
+        let i = icu_pattern::Parser::new(input);
+        let pi = icu_pattern::interpolate(i, vec![time.items, date.items])
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        return Ok(pi.into());
     }
 
     pub(super) fn most_granular_time(&self) -> Option<TimeGranularity> {
@@ -98,8 +89,8 @@ impl Pattern {
     }
 }
 
-impl From<Vec<PatternItem>> for Pattern {
-    fn from(items: Vec<PatternItem>) -> Self {
+impl<'p> From<Vec<PatternItem<'p>>> for Pattern<'p> {
+    fn from(items: Vec<PatternItem<'p>>) -> Self {
         Self {
             time_granularity: items.iter().filter_map(get_time_granularity).max(),
             items,
@@ -107,8 +98,8 @@ impl From<Vec<PatternItem>> for Pattern {
     }
 }
 
-impl FromIterator<PatternItem> for Pattern {
-    fn from_iter<I: IntoIterator<Item = PatternItem>>(iter: I) -> Self {
+impl<'p> FromIterator<PatternItem<'p>> for Pattern<'p> {
+    fn from_iter<I: IntoIterator<Item = PatternItem<'p>>>(iter: I) -> Self {
         Self::from(iter.into_iter().collect::<Vec<_>>())
     }
 }

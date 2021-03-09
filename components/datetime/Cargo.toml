@@ -28,9 +28,13 @@ icu_provider = { version = "0.1", path = "../provider" }
 writeable = { version = "0.2", path = "../../utils/writeable" }
 tinystr = { version = "0.4.1" }
 serde = { version = "1.0", features = ["derive"], optional = true }
+icu_simple_formatter = { path = "../../utils/simple_formatter" }
+icu_pattern = { path = "../../utils/pattern" }
+icu_string = { path = "../../utils/string" }
 
 [dev-dependencies]
 criterion = "0.3"
+iai = "0.1"
 icu_benchmark_macros = { version = "0.1", path = "../../tools/benchmark/macros" }
 icu_provider = { version = "0.1", path = "../provider" }
 icu_testdata = { version = "0.1", path = "../../resources/testdata" }
@@ -56,6 +60,10 @@ required-features = ["provider_serde"]
 name = "pattern"
 harness = false
 required-features = ["bench"]
+
+[[bench]]
+name = "pattern_iai"
+harness = false
 
 [[test]]
 name = "datetime"
