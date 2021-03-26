@@ -78,10 +78,12 @@ impl<'p> Pattern<'p> {
         time: Self,
     ) -> Result<Self, Error> {
         let i = icu_pattern::Parser::new(input);
-        let pi = icu_pattern::interpolate(i, vec![time.items, date.items])
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
-        return Ok(pi.into());
+        let mut pi = icu_pattern::Interpolator::new(i, vec![time.items, date.items]);
+        let mut result = vec![];
+        while let Some(elem) = pi.try_next().unwrap() {
+            result.push(elem);
+        }
+        return Ok(result.into());
     }
 
     pub(super) fn most_granular_time(&self) -> Option<TimeGranularity> {

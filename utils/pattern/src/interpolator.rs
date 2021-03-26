@@ -1,4 +1,7 @@
-use crate::{error::ParserError, parser::PlaceholderElement};
+use crate::{
+    error::ParserError,
+    parser::{Parser, PlaceholderElement},
+};
 use std::{borrow::Cow, collections::HashMap, str::FromStr};
 
 type ParserResult<E, R> = std::result::Result<E, ParserError<R>>;
@@ -27,51 +30,65 @@ impl<E> ReplacementProvider<String, E> for HashMap<String, Vec<E>> {
     }
 }
 
-pub fn interpolate<'s, I, R, K, E>(
-    pattern: I,
-    mut replacements: R,
-) -> impl Iterator<Item = ParserResult<E, <K as FromStr>::Err>>
+pub struct Interpolator<'i, 's, R, K, E>
 where
-    I: IntoIterator<Item = ParserResult<PlaceholderElement<'s, K>, <K as FromStr>::Err>>,
-    K: FromStr + std::fmt::Display,
-    K::Err: std::fmt::Debug,
     R: ReplacementProvider<K, E>,
-    E: From<Cow<'s, str>>,
 {
-    let mut current_placeholder: Option<R::Iter> = None;
-    let mut pattern = pattern.into_iter();
+    pattern: Parser<'i, 's, Cow<'s, str>, K>,
+    replacements: R,
+    current_placeholder: Option<R::Iter>,
+}
 
-    std::iter::from_fn(move || loop {
-        if let Some(ref mut placeholder) = &mut current_placeholder {
-            match placeholder.next() {
-                Some(v) => {
-                    return Some(Ok(v));
-                }
-                None => {
-                    current_placeholder = None;
-                }
-            }
+impl<'i, 's, R, K, E> Interpolator<'i, 's, R, K, E>
+where
+    R: ReplacementProvider<K, E>,
+{
+    pub fn new(pattern: Parser<'i, 's, Cow<'s, str>, K>, replacements: R) -> Self {
+        Self {
+            pattern,
+            replacements,
+            current_placeholder: None,
         }
-        if let Some(element) = pattern.next() {
-            match element {
-                Ok(PlaceholderElement::Literal(l)) => {
-                    return Some(Ok(l.into()));
-                }
-                Ok(PlaceholderElement::Placeholder(p)) => match replacements.take_replacement(&p) {
-                    Some(p) => {
-                        current_placeholder = Some(p);
-                        continue;
+    }
+
+    pub fn try_next(&mut self) -> ParserResult<Option<E>, <K as FromStr>::Err>
+    where
+        E: From<Cow<'s, str>>,
+        K: FromStr + std::fmt::Display,
+        K::Err: std::fmt::Debug,
+    {
+        loop {
+            if let Some(ref mut placeholder) = &mut self.current_placeholder {
+                match placeholder.next() {
+                    Some(v) => {
+                        return Ok(Some(v));
                     }
-                    None => return Some(Err(ParserError::MissingPlaceholder(p.to_string()))),
-                },
-                Err(err) => {
-                    return Some(Err(err));
+                    None => {
+                        self.current_placeholder = None;
+                    }
                 }
             }
-        } else {
-            return None;
+            match self.pattern.try_next() {
+                Ok(element) => match element {
+                    Some(PlaceholderElement::Literal(l)) => {
+                        return Ok(Some(l.into()));
+                    }
+                    Some(PlaceholderElement::Placeholder(p)) => match self.replacements.take_replacement(&p)
+                    {
+                        Some(p) => {
+                            self.current_placeholder = Some(p);
+                            continue;
+                        }
+                        None => return Err(ParserError::MissingPlaceholder(p.to_string())),
+                    },
+                    None => {
+                        return Ok(None);
+                    }
+                },
+                Err(err) => return Err(err),
+            }
         }
-    })
+    }
 }
 
 #[cfg(test)]
@@ -129,16 +146,11 @@ mod tests {
                 .iter()
                 .map(|r| r.iter().map(|&t| t.into()).collect())
                 .collect();
-            let mut i = interpolate(iter, replacements);
-            let result = i
-                .try_fold(String::new(), |mut acc, t| {
-                    if t.map(|t| write!(acc, "{}", t)).is_err() {
-                        Err(())
-                    } else {
-                        Ok(acc)
-                    }
-                })
-                .unwrap();
+            let mut i = Interpolator::new(iter, replacements);
+            let mut result = String::new();
+            while let Some(elem) = i.try_next().unwrap() {
+                write!(result, "{}", elem).unwrap();
+            }
             assert_eq!(result, sample.2);
         }
     }

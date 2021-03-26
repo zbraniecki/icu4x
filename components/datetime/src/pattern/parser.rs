@@ -28,7 +28,7 @@ pub struct Parser<'p, S> {
 impl<'p, S> Parser<'p, S> {
     pub fn new<'s>(input: &'p S) -> Self
     where
-        S: Slice<'s>,
+        S: Slice<'s, Cow<'s, str>>,
     {
         let len = input.length();
         Self {
@@ -42,7 +42,7 @@ impl<'p, S> Parser<'p, S> {
 
     pub fn next<'s>(&mut self) -> Result<std::option::Option<PatternItem<'s>>, Error>
     where
-        S: Slice<'s>,
+        S: Slice<'s, Cow<'s, str>>,
     {
         #[cfg(debug_assertions)]
         println!(

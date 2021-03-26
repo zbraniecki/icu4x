@@ -20,17 +20,36 @@ enum ParserState {
     QuotedLiteral,
 }
 
-pub struct Parser<'p, 's, P> {
-    input: &'p Cow<'s, str>,
+pub struct Parser<'p, 's, S, P> {
+    input: &'p S,
     start_idx: usize,
     idx: usize,
     len: usize,
     state: ParserState,
-    marker: PhantomData<P>,
+    marker: PhantomData<&'s P>,
 }
 
-impl<'p, 's, P> Parser<'p, 's, P> {
-    pub fn new(input: &'p Cow<'s, str>) -> Self {
+macro_rules! handle_literal {
+    ($self:expr, $ty:expr) => {{
+        $self.state = $ty;
+        let range = $self.start_idx..$self.idx;
+        $self.start_idx = $self.idx + 1;
+        $self.idx += 1;
+        if !range.is_empty() {
+            return Ok(Some(PlaceholderElement::Literal(
+                $self.input.get_cow_slice(range),
+            )));
+        } else {
+            continue;
+        }
+    }};
+}
+
+impl<'p, 's, S, P> Parser<'p, 's, S, P> {
+    pub fn new(input: &'p S) -> Self
+    where
+        S: Slice<'s, Cow<'s, str>>,
+    {
         let len = input.length();
         Self {
             input,
@@ -41,32 +60,15 @@ impl<'p, 's, P> Parser<'p, 's, P> {
             marker: std::marker::PhantomData,
         }
     }
-}
 
-macro_rules! handle_literal {
-    ($self:expr, $ty:expr) => {{
-        $self.state = $ty;
-        let range = $self.start_idx..$self.idx;
-        $self.start_idx = $self.idx + 1;
-        $self.idx += 1;
-        if !range.is_empty() {
-            return Some(Ok(PlaceholderElement::Literal(
-                $self.input.get_cow_slice(range),
-            )));
-        } else {
-            continue;
-        }
-    }};
-}
-
-impl<'p, 's, P> Iterator for Parser<'p, 's, P>
-where
-    P: FromStr + Display,
-    P::Err: Debug,
-{
-    type Item = Result<PlaceholderElement<'s, P>, ParserError<<P as FromStr>::Err>>;
-
-    fn next(&mut self) -> std::option::Option<<Self as Iterator>::Item> {
+    pub fn try_next(
+        &mut self,
+    ) -> Result<Option<PlaceholderElement<'s, P>>, ParserError<<P as FromStr>::Err>>
+    where
+        S: Slice<'s, Cow<'s, str>>,
+        P: FromStr + Display,
+        P::Err: Debug,
+    {
         while let Some(b) = self.input.get_byte(self.idx) {
             match self.state {
                 ParserState::Placeholder if b == b'}' => {
@@ -76,10 +78,10 @@ where
                     self.idx += 1;
                     match self.input.get_str_slice(range).parse() {
                         Ok(ret) => {
-                            return Some(Ok(PlaceholderElement::Placeholder(ret)));
+                            return Ok(Some(PlaceholderElement::Placeholder(ret)));
                         }
                         Err(err) => {
-                            return Some(Err(ParserError::InvalidPlaceholder(err)));
+                            return Err(ParserError::InvalidPlaceholder(err));
                         }
                     }
                 }
@@ -98,17 +100,17 @@ where
             }
         }
         match self.state {
-            ParserState::Placeholder => Some(Err(ParserError::UnclosedPlaceholder)),
-            ParserState::QuotedLiteral => Some(Err(ParserError::UnclosedQuotedLiteral)),
+            ParserState::Placeholder => Err(ParserError::UnclosedPlaceholder),
+            ParserState::QuotedLiteral => Err(ParserError::UnclosedQuotedLiteral),
             ParserState::Default => {
                 let range = self.start_idx..self.len;
                 self.start_idx = self.len;
                 if !range.is_empty() {
-                    Some(Ok(PlaceholderElement::Literal(
+                    Ok(Some(PlaceholderElement::Literal(
                         self.input.get_cow_slice(range),
                     )))
                 } else {
-                    None
+                    Ok(None)
                 }
             }
         }
@@ -121,11 +123,14 @@ mod tests {
 
     #[test]
     fn simple_parse() {
-        let input = "{0} and {1} FOO".into();
-        let iter = Parser::new(&input);
-        let v: Result<Vec<_>, _> = iter.collect();
+        let input: Cow<str> = "{0} and {1} FOO".into();
+        let mut iter = Parser::new(&input);
+        let mut result = vec![];
+        while let Some(elem) = iter.try_next().unwrap() {
+            result.push(elem);
+        }
         assert_eq!(
-            v.unwrap(),
+            result,
             vec![
                 PlaceholderElement::Placeholder(0),
                 PlaceholderElement::Literal(" and ".into()),
