@@ -30,6 +30,7 @@ use std::{
 /// - `p`: The life time of an input string slice to be parsed.
 ///
 /// [`ReplacementProvider`]: crate::ReplacementProvider
+#[derive(Debug)]
 pub struct Pattern<'s, P>(pub(crate) Vec<PatternToken<'s, P>>);
 
 impl<'s, P> Pattern<'s, P> {

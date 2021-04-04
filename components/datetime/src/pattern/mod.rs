@@ -8,8 +8,12 @@ mod parser;
 use crate::fields::{self, Field, FieldLength, FieldSymbol};
 pub use error::Error;
 use parser::Parser;
-use std::{convert::TryFrom, fmt};
-use std::{fmt::Write, iter::FromIterator};
+use std::{
+    convert::TryFrom,
+    fmt::{self, Write},
+    borrow::Cow,
+    iter::FromIterator,
+};
 
 #[cfg(feature = "provider_serde")]
 use serde::{
@@ -23,12 +27,13 @@ use serde::{
     feature = "provider_serde",
     derive(serde::Serialize, serde::Deserialize)
 )]
-pub enum PatternItem {
+pub enum PatternItem<'s> {
     Field(fields::Field),
-    Literal(String),
+    #[serde(borrow)]
+    Literal(Cow<'s, str>),
 }
 
-impl From<(FieldSymbol, FieldLength)> for PatternItem {
+impl<'s> From<(FieldSymbol, FieldLength)> for PatternItem<'s> {
     fn from(input: (FieldSymbol, FieldLength)) -> Self {
         Self::Field(Field {
             symbol: input.0,
@@ -37,7 +42,7 @@ impl From<(FieldSymbol, FieldLength)> for PatternItem {
     }
 }
 
-impl TryFrom<(FieldSymbol, u8)> for PatternItem {
+impl<'s> TryFrom<(FieldSymbol, u8)> for PatternItem<'s> {
     type Error = Error;
     fn try_from(input: (FieldSymbol, u8)) -> Result<Self, Self::Error> {
         let length = FieldLength::try_from(input.1).map_err(|_| Error::FieldTooLong(input.0))?;
@@ -48,15 +53,15 @@ impl TryFrom<(FieldSymbol, u8)> for PatternItem {
     }
 }
 
-impl<'p> From<&str> for PatternItem {
-    fn from(input: &str) -> Self {
+impl<'s> From<&'s str> for PatternItem<'s> {
+    fn from(input: &'s str) -> Self {
         Self::Literal(input.into())
     }
 }
 
-impl<'p> From<String> for PatternItem {
+impl<'s> From<String> for PatternItem<'s> {
     fn from(input: String) -> Self {
-        Self::Literal(input)
+        Self::Literal(input.into())
     }
 }
 
@@ -74,8 +79,17 @@ pub(super) enum TimeGranularity {
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
-pub struct Pattern {
-    items: Vec<PatternItem>,
+#[cfg_attr(
+    feature = "provider_serde",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+pub struct Pattern<'s> {
+    #[serde(borrow)]
+    items: Vec<PatternItem<'s>>,
+    #[cfg_attr(
+        all(feature="provider_serde", not(feature="serialize_none")),
+        serde(skip_serializing_if = "Option::is_none"))
+    ]
     time_granularity: Option<TimeGranularity>,
 }
 
@@ -93,20 +107,21 @@ fn get_time_granularity(item: &PatternItem) -> Option<TimeGranularity> {
     }
 }
 
-impl Pattern {
+impl<'s> Pattern<'s> {
     pub fn items(&self) -> &[PatternItem] {
         &self.items
     }
 
-    pub fn from_bytes(input: &str) -> Result<Self, Error> {
+    pub fn from_bytes(input: &'s str) -> Result<Self, Error> {
         Parser::new(input).parse().map(Pattern::from)
     }
 
     // TODO(#277): This should be turned into a utility for all ICU4X.
     pub fn from_bytes_combination(input: &str, date: Self, time: Self) -> Result<Self, Error> {
-        Parser::new(input)
-            .parse_placeholders(vec![time, date])
-            .map(Pattern::from)
+        panic!();
+        // Parser::new(input)
+        //     .parse_placeholders(vec![time, date])
+        //     .map(Pattern::from)
     }
 
     pub(super) fn most_granular_time(&self) -> Option<TimeGranularity> {
@@ -114,8 +129,8 @@ impl Pattern {
     }
 }
 
-impl From<Vec<PatternItem>> for Pattern {
-    fn from(items: Vec<PatternItem>) -> Self {
+impl<'s> From<Vec<PatternItem<'s>>> for Pattern<'s> {
+    fn from(items: Vec<PatternItem<'s>>) -> Self {
         Self {
             time_granularity: items.iter().filter_map(get_time_granularity).max(),
             items,
@@ -128,7 +143,7 @@ impl From<Vec<PatternItem>> for Pattern {
 /// this was not done, as this code would need to implement the `write_len` method, which would
 /// need to duplicate the branching logic of the `fmt` method here. This code is used in generating
 /// the data providers and is not as performance sensitive.
-impl fmt::Display for Pattern {
+impl<'s> fmt::Display for Pattern<'s> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         for pattern_item in self.items().iter() {
             match pattern_item {
@@ -190,92 +205,93 @@ impl fmt::Display for Pattern {
     }
 }
 
-impl FromIterator<PatternItem> for Pattern {
-    fn from_iter<I: IntoIterator<Item = PatternItem>>(iter: I) -> Self {
+impl<'s> FromIterator<PatternItem<'s>> for Pattern<'s> {
+    fn from_iter<I: IntoIterator<Item = PatternItem<'s>>>(iter: I) -> Self {
         Self::from(iter.into_iter().collect::<Vec<_>>())
     }
 }
 
-#[cfg(feature = "provider_serde")]
-struct DeserializePatternUTS35String;
+// #[cfg(feature = "provider_serde")]
+// struct DeserializePatternUTS35String;
 
-#[cfg(feature = "provider_serde")]
-impl<'de> de::Visitor<'de> for DeserializePatternUTS35String {
-    type Value = Pattern;
+// #[cfg(feature = "provider_serde")]
+// impl<'de> de::Visitor<'de> for DeserializePatternUTS35String {
+//     type Value = Pattern<'de>;
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "Expected to find a valid pattern.")
-    }
+//     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+//         write!(formatter, "Expected to find a valid pattern.")
+//     }
 
-    fn visit_str<E>(self, pattern_string: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        // Parse a string into a list of fields.
-        Pattern::from_bytes(pattern_string).map_err(|err| {
-            de::Error::invalid_value(
-                de::Unexpected::Other(&format!("{}", err)),
-                &"a valid UTS 35 pattern string",
-            )
-        })
-    }
-}
+//     fn visit_str<E>(self, pattern_string: &str) -> Result<Self::Value, E>
+//     where
+//         E: de::Error,
+//     {
+//         // Parse a string into a list of fields.
+//         // Pattern::from_bytes(pattern_string).map_err(|err| {
+//         //     de::Error::invalid_value(
+//         //         de::Unexpected::Other(&format!("{}", err)),
+//         //         &"a valid UTS 35 pattern string",
+//         //     )
+//         // })
+//         panic!()
+//     }
+// }
 
-#[cfg(feature = "provider_serde")]
-struct DeserializePatternBincode;
+// #[cfg(feature = "provider_serde")]
+// struct DeserializePatternBincode;
 
-#[cfg(feature = "provider_serde")]
-impl<'de> de::Visitor<'de> for DeserializePatternBincode {
-    type Value = Pattern;
+// #[cfg(feature = "provider_serde")]
+// impl<'de> de::Visitor<'de> for DeserializePatternBincode {
+//     type Value = Pattern<'de>;
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "Unable to deserialize a bincode Pattern.")
-    }
+//     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+//         write!(formatter, "Unable to deserialize a bincode Pattern.")
+//     }
 
-    fn visit_seq<V>(self, mut seq: V) -> Result<Pattern, V::Error>
-    where
-        V: de::SeqAccess<'de>,
-    {
-        let mut items = Vec::new();
-        while let Some(item) = seq.next_element()? {
-            items.push(item)
-        }
-        Ok(Pattern::from(items))
-    }
-}
+//     fn visit_seq<V>(self, mut seq: V) -> Result<Pattern<'de>, V::Error>
+//     where
+//         V: de::SeqAccess<'de>,
+//     {
+//         let mut items = Vec::new();
+//         while let Some(item) = seq.next_element()? {
+//             items.push(item)
+//         }
+//         Ok(Pattern::from(items))
+//     }
+// }
 
-#[cfg(feature = "provider_serde")]
-impl<'de> Deserialize<'de> for Pattern {
-    fn deserialize<D>(deserializer: D) -> Result<Pattern, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        if deserializer.is_human_readable() {
-            deserializer.deserialize_str(DeserializePatternUTS35String)
-        } else {
-            deserializer.deserialize_seq(DeserializePatternBincode)
-        }
-    }
-}
+// #[cfg(feature = "provider_serde")]
+// impl<'de> Deserialize<'de> for Pattern<'de> {
+//     fn deserialize<D>(deserializer: D) -> Result<Pattern<'de>, D::Error>
+//     where
+//         D: Deserializer<'de>,
+//     {
+//         if deserializer.is_human_readable() {
+//             deserializer.deserialize_str(DeserializePatternUTS35String)
+//         } else {
+//             deserializer.deserialize_seq(DeserializePatternBincode)
+//         }
+//     }
+// }
 
-#[cfg(feature = "provider_serde")]
-impl Serialize for Pattern {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: ser::Serializer,
-    {
-        if serializer.is_human_readable() {
-            // Serialize into the UTS 35 string representation.
-            let string: String = self.to_string();
-            serializer.serialize_str(&string)
-        } else {
-            // Serialize into a bincode-friendly representation. This means that pattern parsing
-            // will not be needed when deserializing.
-            let mut seq = serializer.serialize_seq(Some(self.items.len()))?;
-            for item in self.items.iter() {
-                seq.serialize_element(item)?;
-            }
-            seq.end()
-        }
-    }
-}
+// #[cfg(feature = "provider_serde")]
+// impl<'s> Serialize for Pattern<'s> {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: ser::Serializer,
+//     {
+//         if serializer.is_human_readable() {
+//             // Serialize into the UTS 35 string representation.
+//             let string: String = self.to_string();
+//             serializer.serialize_str(&string)
+//         } else {
+//             // Serialize into a bincode-friendly representation. This means that pattern parsing
+//             // will not be needed when deserializing.
+//             let mut seq = serializer.serialize_seq(Some(self.items.len()))?;
+//             for item in self.items.iter() {
+//                 seq.serialize_element(item)?;
+//             }
+//             seq.end()
+//         }
+//     }
+// }

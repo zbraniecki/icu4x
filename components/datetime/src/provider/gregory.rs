@@ -9,10 +9,12 @@ use std::borrow::Cow;
     feature = "provider_serde",
     derive(serde::Serialize, serde::Deserialize)
 )]
-pub struct DatesV1 {
-    pub symbols: DateSymbolsV1,
+pub struct DatesV1<'s> {
+    #[serde(borrow)]
+    pub symbols: DateSymbolsV1<'s>,
 
-    pub patterns: PatternsV1,
+    #[serde(borrow)]
+    pub patterns: PatternsV1<'s>,
 }
 
 #[derive(Debug, PartialEq, Clone, Default)]
@@ -20,12 +22,15 @@ pub struct DatesV1 {
     feature = "provider_serde",
     derive(serde::Serialize, serde::Deserialize)
 )]
-pub struct DateSymbolsV1 {
-    pub months: months::ContextsV1,
+pub struct DateSymbolsV1<'s> {
+    #[serde(borrow)]
+    pub months: months::ContextsV1<'s>,
 
-    pub weekdays: weekdays::ContextsV1,
+    #[serde(borrow)]
+    pub weekdays: weekdays::ContextsV1<'s>,
 
-    pub day_periods: day_periods::ContextsV1,
+    #[serde(borrow)]
+    pub day_periods: day_periods::ContextsV1<'s>,
 }
 
 #[derive(Debug, PartialEq, Clone, Default)]
@@ -33,12 +38,15 @@ pub struct DateSymbolsV1 {
     feature = "provider_serde",
     derive(serde::Serialize, serde::Deserialize)
 )]
-pub struct PatternsV1 {
-    pub date: patterns::StylePatternsV1,
+pub struct PatternsV1<'s> {
+    #[serde(borrow)]
+    pub date: patterns::StylePatternsV1<'s>,
 
-    pub time: patterns::StylePatternsV1,
+    #[serde(borrow)]
+    pub time: patterns::StylePatternsV1<'s>,
 
-    pub date_time: patterns::DateTimeFormatsV1,
+    #[serde(borrow)]
+    pub date_time: patterns::DateTimeFormatsV1<'s>,
 }
 
 macro_rules! symbols {
@@ -48,7 +56,7 @@ macro_rules! symbols {
 
                 #[derive(Debug, PartialEq, Clone, Default)]
                 #[cfg_attr(feature="provider_serde", derive(serde::Serialize, serde::Deserialize))]
-                pub struct SymbolsV1(pub $expr);
+                pub struct SymbolsV1<'s>(pub $expr);
 
                 symbols!();
             }
@@ -94,7 +102,7 @@ macro_rules! symbols {
 
                 #[derive(Debug, PartialEq, Clone, Default)]
                 #[cfg_attr(feature="provider_serde", derive(serde::Serialize, serde::Deserialize))]
-                pub struct SymbolsV1 {
+                pub struct SymbolsV1<'s> {
                     $($members)*
                 }
                 symbols!();
@@ -105,66 +113,76 @@ macro_rules! symbols {
             // except of `short`.
             #[derive(Debug, PartialEq, Clone, Default)]
             #[cfg_attr(feature="provider_serde", derive(serde::Serialize, serde::Deserialize))]
-            pub struct FormatWidthsV1 {
-                pub abbreviated: SymbolsV1,
-                pub narrow: SymbolsV1,
+            pub struct FormatWidthsV1<'s> {
+                #[serde(borrow)]
+                pub abbreviated: SymbolsV1<'s>,
+                #[serde(borrow)]
+                pub narrow: SymbolsV1<'s>,
                 #[cfg_attr(
                     all(feature="provider_serde", not(feature="serialize_none")),
                     serde(skip_serializing_if = "Option::is_none"))
                 ]
-                pub short: Option<SymbolsV1>,
-                pub wide: SymbolsV1,
+                #[serde(borrow)]
+                pub short: Option<SymbolsV1<'s>>,
+                #[serde(borrow)]
+                pub wide: SymbolsV1<'s>,
             }
 
             // UTS 35 specifies that `stand_alone` widths are optional
             #[derive(Debug, PartialEq, Clone, Default)]
             #[cfg_attr(feature="provider_serde", derive(serde::Serialize, serde::Deserialize))]
-            pub struct StandAloneWidthsV1 {
+            pub struct StandAloneWidthsV1<'s> {
                 #[cfg_attr(
                     all(feature="provider_serde", not(feature="serialize_none")),
                     serde(skip_serializing_if = "Option::is_none"))
                 ]
-                pub abbreviated: Option<SymbolsV1>,
+                #[serde(borrow)]
+                pub abbreviated: Option<SymbolsV1<'s>>,
                 #[cfg_attr(
                     all(feature="provider_serde", not(feature="serialize_none")),
                     serde(skip_serializing_if = "Option::is_none"))
                 ]
-                pub narrow: Option<SymbolsV1>,
+                #[serde(borrow)]
+                pub narrow: Option<SymbolsV1<'s>>,
                 #[cfg_attr(
                     all(feature="provider_serde", not(feature="serialize_none")),
                     serde(skip_serializing_if = "Option::is_none"))
                 ]
-                pub short: Option<SymbolsV1>,
+                #[serde(borrow)]
+                pub short: Option<SymbolsV1<'s>>,
                 #[cfg_attr(
                     all(feature="provider_serde", not(feature="serialize_none")),
                     serde(skip_serializing_if = "Option::is_none"))
                 ]
-                pub wide: Option<SymbolsV1>,
+                #[serde(borrow)]
+                pub wide: Option<SymbolsV1<'s>>,
             }
 
             #[derive(Debug, PartialEq, Clone, Default)]
             #[cfg_attr(feature="provider_serde", derive(serde::Serialize, serde::Deserialize))]
-            pub struct ContextsV1 {
-                pub format: FormatWidthsV1,
+            pub struct ContextsV1<'s> {
+                #[serde(borrow)]
+                pub format: FormatWidthsV1<'s>,
                 #[cfg_attr(
                     all(feature="provider_serde", not(feature="serialize_none")),
                     serde(skip_serializing_if = "Option::is_none"))
                 ]
-                pub stand_alone: Option<StandAloneWidthsV1>,
+                #[serde(borrow)]
+                pub stand_alone: Option<StandAloneWidthsV1<'s>>,
             }
         };
     }
 
-symbols!(months, [Cow<'static, str>; 12]);
+symbols!(months, [Cow<'s, str>; 12]);
 
-symbols!(weekdays, [Cow<'static, str>; 7]);
+symbols!(weekdays, [Cow<'s, str>; 7]);
 
 symbols!(
     day_periods {
-        am: Cow<'static, str>,
-        pm: Cow<'static, str>,
-        noon: Option<Cow<'static, str>>,
-        midnight: Option<Cow<'static, str>>,
+        am: Cow<'s, str>,
+        pm: Cow<'s, str>,
+        noon: Option<Cow<'s, str>>,
+        midnight: Option<Cow<'s, str>>,
     }
 );
 
@@ -182,11 +200,15 @@ pub mod patterns {
         feature = "provider_serde",
         derive(serde::Serialize, serde::Deserialize)
     )]
-    pub struct StylePatternsV1 {
-        pub full: Cow<'static, str>,
-        pub long: Cow<'static, str>,
-        pub medium: Cow<'static, str>,
-        pub short: Cow<'static, str>,
+    pub struct StylePatternsV1<'s> {
+        #[serde(borrow)]
+        pub full: Cow<'s, str>,
+        #[serde(borrow)]
+        pub long: Cow<'s, str>,
+        #[serde(borrow)]
+        pub medium: Cow<'s, str>,
+        #[serde(borrow)]
+        pub short: Cow<'s, str>,
     }
 
     /// This struct is a public wrapper around the internal Pattern struct. This allows
@@ -195,30 +217,36 @@ pub mod patterns {
     ///
     /// The Pattern is an "exotic type" in the serialization process, and handles its own
     /// custom serialization practices.
-    #[derive(Debug, PartialEq, Clone, Default)]
-    #[cfg_attr(
-        feature = "provider_serde",
-        derive(serde::Serialize, serde::Deserialize)
-    )]
-    pub struct PatternV1(pub Pattern);
+    // #[derive(Debug, PartialEq, Clone, Default)]
+    // #[cfg_attr(
+    //     feature = "provider_serde",
+    //     derive(serde::Serialize, serde::Deserialize)
+    // )]
+    // pub struct PatternV1<'s>(
+    //     // #[cfg_attr(
+    //     //     feature = "provider_serde",
+    //     //     serde(borrow)
+    //     // )]
+    //     pub Pattern<'s>
+    // );
 
-    impl From<Pattern> for PatternV1 {
-        fn from(pattern: Pattern) -> Self {
-            Self(pattern)
-        }
-    }
+    // impl<'s> From<Pattern<'s>> for PatternV1<'s> {
+    //     fn from(pattern: Pattern<'s>) -> Self {
+    //         Self(pattern)
+    //     }
+    // }
 
-    impl TryFrom<&str> for PatternV1 {
-        type Error = pattern::Error;
+    // impl<'s> TryFrom<&'s str> for PatternV1<'s> {
+    //     type Error = pattern::Error;
 
-        fn try_from(pattern_string: &str) -> Result<Self, Self::Error> {
-            let pattern = Pattern::from_bytes(pattern_string);
-            match pattern {
-                Ok(pattern) => Ok(PatternV1::from(pattern)),
-                Err(err) => Err(err),
-            }
-        }
-    }
+    //     fn try_from(pattern_string: &'s str) -> Result<Self, Self::Error> {
+    //         let pattern = Pattern::from_bytes(pattern_string);
+    //         match pattern {
+    //             Ok(pattern) => Ok(PatternV1::from(pattern)),
+    //             Err(err) => Err(err),
+    //         }
+    //     }
+    // }
 
     /// This struct is a public wrapper around the internal Skeleton struct. This allows
     /// access to the serialization and deserialization capabilities, without exposing the
@@ -249,15 +277,17 @@ pub mod patterns {
         feature = "provider_serde",
         derive(serde::Serialize, serde::Deserialize)
     )]
-    pub struct SkeletonsV1(pub LiteMap<SkeletonV1, PatternV1>);
+    pub struct SkeletonsV1<'s>(#[serde(borrow)] pub LiteMap<SkeletonV1, Pattern<'s>>);
 
     #[derive(Debug, PartialEq, Clone, Default)]
     #[cfg_attr(
         feature = "provider_serde",
         derive(serde::Serialize, serde::Deserialize)
     )]
-    pub struct DateTimeFormatsV1 {
-        pub style_patterns: StylePatternsV1,
-        pub skeletons: SkeletonsV1,
+    pub struct DateTimeFormatsV1<'s> {
+        #[serde(borrow)]
+        pub style_patterns: StylePatternsV1<'s>,
+        #[serde(borrow)]
+        pub skeletons: SkeletonsV1<'s>,
     }
 }

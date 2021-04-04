@@ -138,43 +138,117 @@
         "short": "{1} {0}"
       },
       "skeletons": {
-        "y": "y",
-        "yM": "M/y",
-        "yMd": "d/M/y",
-        "yMdE": "E d/M/y",
-        "yMMM": "MMM y",
-        "yMMMd": "d MMM y",
-        "yMMMdE": "E d MMM y",
-        "yMMMdEEEE": "EEEEที่ d MMM y",
-        "yMMMM": "MMMM 'G' y",
-        "yMMMMd": "d MMMM 'G' y",
-        "yMMMMdE": "E d MMMM 'G' y",
-        "yMMMMdEEEE": "EEEEที่ d MMMM 'G' y",
-        "M": "L",
-        "Md": "d/M",
-        "MdE": "E d/M",
-        "MMM": "LLL",
-        "MMMd": "d MMM",
-        "MMMdE": "E d MMM",
-        "MMMdEEEE": "EEEEที่ d MMM",
-        "MMMMd": "d MMMM",
-        "MMMMdE": "E d MMMM",
-        "MMMMdEEEE": "EEEEที่ d MMMM",
-        "d": "d",
-        "dE": "E d",
-        "E": "ccc",
-        "Ehm": "E h:mm a",
-        "Ehms": "E h:mm:ss a",
-        "EHm": "E HH:mm น.",
-        "EHms": "E HH:mm:ss",
-        "h": "h a",
-        "hm": "h:mm a",
-        "hms": "h:mm:ss a",
-        "H": "HH",
-        "Hm": "HH:mm น.",
-        "Hms": "HH:mm:ss",
-        "ms": "mm:ss",
-        "mmss": "mm:ss"
+        "y": {
+          "items": []
+        },
+        "yM": {
+          "items": []
+        },
+        "yMd": {
+          "items": []
+        },
+        "yMdE": {
+          "items": []
+        },
+        "yMMM": {
+          "items": []
+        },
+        "yMMMd": {
+          "items": []
+        },
+        "yMMMdE": {
+          "items": []
+        },
+        "yMMMdEEEE": {
+          "items": []
+        },
+        "yMMMM": {
+          "items": []
+        },
+        "yMMMMd": {
+          "items": []
+        },
+        "yMMMMdE": {
+          "items": []
+        },
+        "yMMMMdEEEE": {
+          "items": []
+        },
+        "M": {
+          "items": []
+        },
+        "Md": {
+          "items": []
+        },
+        "MdE": {
+          "items": []
+        },
+        "MMM": {
+          "items": []
+        },
+        "MMMd": {
+          "items": []
+        },
+        "MMMdE": {
+          "items": []
+        },
+        "MMMdEEEE": {
+          "items": []
+        },
+        "MMMMd": {
+          "items": []
+        },
+        "MMMMdE": {
+          "items": []
+        },
+        "MMMMdEEEE": {
+          "items": []
+        },
+        "d": {
+          "items": []
+        },
+        "dE": {
+          "items": []
+        },
+        "E": {
+          "items": []
+        },
+        "Ehm": {
+          "items": []
+        },
+        "Ehms": {
+          "items": []
+        },
+        "EHm": {
+          "items": []
+        },
+        "EHms": {
+          "items": []
+        },
+        "h": {
+          "items": []
+        },
+        "hm": {
+          "items": []
+        },
+        "hms": {
+          "items": []
+        },
+        "H": {
+          "items": []
+        },
+        "Hm": {
+          "items": []
+        },
+        "Hms": {
+          "items": []
+        },
+        "ms": {
+          "items": []
+        },
+        "mmss": {
+          "items": []
+        }
       }
     }
   }

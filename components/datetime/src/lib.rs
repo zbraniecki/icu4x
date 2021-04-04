@@ -136,8 +136,8 @@ use std::borrow::Cow;
 /// asynchronous `DataProvider` and corresponding asynchronous constructor.
 pub struct DateTimeFormat<'d> {
     locale: Locale,
-    pattern: Pattern,
-    symbols: Cow<'d, provider::gregory::DateSymbolsV1>,
+    pattern: Pattern<'d>,
+    symbols: Cow<'d, provider::gregory::DateSymbolsV1<'d>>,
 }
 
 impl<'d> DateTimeFormat<'d> {
@@ -163,7 +163,7 @@ impl<'d> DateTimeFormat<'d> {
     ///
     /// assert_eq!(dtf.is_ok(), true);
     /// ```
-    pub fn try_new<T: Into<Locale>, D: DataProvider<'d, provider::gregory::DatesV1> + ?Sized>(
+    pub fn try_new<T: Into<Locale>, D: DataProvider<'d, provider::gregory::DatesV1<'d>> + ?Sized>(
         locale: T,
         data_provider: &D,
         options: &DateTimeFormatOptions,

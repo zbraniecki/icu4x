@@ -61,11 +61,11 @@ impl<'d> KeyedDataProvider for DatesProvider<'d> {
     }
 }
 
-impl<'d> DataProvider<'d, gregory::DatesV1> for DatesProvider<'d> {
+impl<'d, 's> DataProvider<'d, gregory::DatesV1<'s>> for DatesProvider<'d> {
     fn load_payload(
         &self,
         req: &DataRequest,
-    ) -> Result<DataResponse<'d, gregory::DatesV1>, DataError> {
+    ) -> Result<DataResponse<'d, gregory::DatesV1<'s>>, DataError> {
         DatesProvider::supports_key(&req.resource_path.key)?;
         let cldr_langid: CldrLangID = req.try_langid()?.clone().into();
         let dates = match self
@@ -106,7 +106,7 @@ impl<'d> IterableDataProviderCore for DatesProvider<'d> {
     }
 }
 
-impl From<&cldr_json::StylePatterns> for gregory::patterns::StylePatternsV1 {
+impl<'s> From<&cldr_json::StylePatterns> for gregory::patterns::StylePatternsV1<'s> {
     fn from(other: &cldr_json::StylePatterns) -> Self {
         // TODO(#308): Support numbering system variations. We currently throw them away.
         Self {
@@ -118,9 +118,9 @@ impl From<&cldr_json::StylePatterns> for gregory::patterns::StylePatternsV1 {
     }
 }
 
-impl From<&cldr_json::DateTimeFormats> for gregory::patterns::DateTimeFormatsV1 {
+impl<'s> From<&cldr_json::DateTimeFormats> for gregory::patterns::DateTimeFormatsV1<'s> {
     fn from(other: &cldr_json::DateTimeFormats) -> Self {
-        use gregory::patterns::{PatternV1, SkeletonV1, SkeletonsV1};
+        use gregory::patterns::{SkeletonV1, SkeletonsV1};
         use litemap::LiteMap;
 
         // TODO(#308): Support numbering system variations. We currently throw them away.
@@ -167,10 +167,10 @@ impl From<&cldr_json::DateTimeFormats> for gregory::patterns::DateTimeFormatsV1 
                         );
                     }
 
-                    let pattern_v1 = PatternV1::try_from(pattern_str as &str)
-                        .expect("Unable to parse a pattern");
+                    use icu_datetime::pattern::Pattern;
+                    let pattern = Pattern::from_bytes(pattern_str).unwrap();
 
-                    skeletons.0.insert(skeleton_fields_v1, pattern_v1);
+                    skeletons.0.insert(skeleton_fields_v1, pattern);
                 }
 
                 skeletons
@@ -179,7 +179,7 @@ impl From<&cldr_json::DateTimeFormats> for gregory::patterns::DateTimeFormatsV1 
     }
 }
 
-impl From<&cldr_json::Dates> for gregory::DatesV1 {
+impl<'s> From<&cldr_json::Dates> for gregory::DatesV1<'s> {
     fn from(other: &cldr_json::Dates) -> Self {
         Self {
             symbols: gregory::DateSymbolsV1 {
@@ -198,7 +198,7 @@ impl From<&cldr_json::Dates> for gregory::DatesV1 {
 
 macro_rules! symbols_from {
     ([$name: ident, $name2: ident $(,)?], [ $($element: ident),+ $(,)? ] $(,)?) => {
-        impl From<&cldr_json::$name::Symbols> for gregory::$name2::SymbolsV1 {
+        impl<'s> From<&cldr_json::$name::Symbols> for gregory::$name2::SymbolsV1<'s> {
             fn from(other: &cldr_json::$name::Symbols) -> Self {
                 Self([
                     $(
@@ -210,7 +210,7 @@ macro_rules! symbols_from {
         symbols_from!([$name, $name2]);
     };
     ([$name: ident, $name2: ident $(,)?], { $($element: ident),+ $(,)? } $(,)?) => {
-        impl From<&cldr_json::$name::Symbols> for gregory::$name2::SymbolsV1 {
+        impl<'s> From<&cldr_json::$name::Symbols> for gregory::$name2::SymbolsV1<'s> {
             fn from(other: &cldr_json::$name::Symbols) -> Self {
                 Self {
                     $(
@@ -233,7 +233,7 @@ macro_rules! symbols_from {
             }
         }
 
-        impl From<&cldr_json::$name::Contexts> for gregory::$name2::ContextsV1 {
+        impl<'s> From<&cldr_json::$name::Contexts> for gregory::$name2::ContextsV1<'s> {
             fn from(other: &cldr_json::$name::Contexts) -> Self {
                 Self {
                     format: (&other.format).into(),
@@ -269,7 +269,7 @@ macro_rules! symbols_from {
             }
         }
 
-        impl From<&cldr_json::$name::FormatWidths> for gregory::$name2::FormatWidthsV1 {
+        impl<'s> From<&cldr_json::$name::FormatWidths> for gregory::$name2::FormatWidthsV1<'s> {
             fn from(other: &cldr_json::$name::FormatWidths) -> Self {
                 Self {
                     abbreviated: (&other.abbreviated).into(),
@@ -280,7 +280,7 @@ macro_rules! symbols_from {
             }
         }
 
-        impl From<&cldr_json::$name::StandAloneWidths> for gregory::$name2::StandAloneWidthsV1 {
+        impl<'s> From<&cldr_json::$name::StandAloneWidths> for gregory::$name2::StandAloneWidthsV1<'s> {
             fn from(other: &cldr_json::$name::StandAloneWidths) -> Self {
                 Self {
                     abbreviated: other.abbreviated.as_ref().map(|width| width.into()),

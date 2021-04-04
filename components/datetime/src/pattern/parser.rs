@@ -78,7 +78,7 @@ impl<'p> Parser<'p> {
         }
     }
 
-    fn collect_segment(state: Segment, result: &mut Vec<PatternItem>) -> Result<(), Error> {
+    fn collect_segment(state: Segment, result: &mut Vec<PatternItem<'p>>) -> Result<(), Error> {
         match state {
             Segment::Symbol { symbol, length } => {
                 result.push((symbol, length).try_into()?);
@@ -95,7 +95,7 @@ impl<'p> Parser<'p> {
         Ok(())
     }
 
-    pub fn parse(mut self) -> Result<Vec<PatternItem>, Error> {
+    pub fn parse(mut self) -> Result<Vec<PatternItem<'p>>, Error> {
         let mut chars = self.source.chars().peekable();
         let mut result = vec![];
 
@@ -141,44 +141,45 @@ impl<'p> Parser<'p> {
 
     pub fn parse_placeholders(
         mut self,
-        mut replacements: Vec<Pattern>,
-    ) -> Result<Vec<PatternItem>, Error> {
-        let mut chars = self.source.chars().peekable();
-        let mut result = vec![];
+        mut replacements: Vec<Pattern<'p>>,
+    ) -> Result<Vec<PatternItem<'p>>, Error> {
+        panic!();
+        // let mut chars = self.source.chars().peekable();
+        // let mut result = vec![];
 
-        while let Some(ch) = chars.next() {
-            if !self.handle_quoted_literal(ch, &mut chars, &mut result)? {
-                if ch == '{' {
-                    Self::collect_segment(self.state, &mut result)?;
+        // while let Some(ch) = chars.next() {
+        //     if !self.handle_quoted_literal(ch, &mut chars, &mut result)? {
+        //         if ch == '{' {
+        //             Self::collect_segment(self.state, &mut result)?;
 
-                    let ch = chars.next().ok_or(Error::UnclosedPlaceholder)?;
-                    let idx: u32 = ch.to_digit(10).ok_or(Error::UnknownSubstitution(ch))?;
-                    let replacement = replacements
-                        .get_mut(idx as usize)
-                        .ok_or(Error::UnknownSubstitution(ch))?;
-                    result.extend_from_slice(replacement.items());
-                    let ch = chars.next().ok_or(Error::UnclosedPlaceholder)?;
-                    if ch != '}' {
-                        return Err(Error::UnclosedPlaceholder);
-                    }
-                    self.state = Segment::Literal {
-                        literal: String::new(),
-                        quoted: false,
-                    };
-                } else if let Segment::Literal {
-                    ref mut literal, ..
-                } = self.state
-                {
-                    literal.push(ch);
-                } else {
-                    unreachable!()
-                }
-            }
-        }
+        //             let ch = chars.next().ok_or(Error::UnclosedPlaceholder)?;
+        //             let idx: u32 = ch.to_digit(10).ok_or(Error::UnknownSubstitution(ch))?;
+        //             let replacement = replacements
+        //                 .get_mut(idx as usize)
+        //                 .ok_or(Error::UnknownSubstitution(ch))?;
+        //             result.extend_from_slice(replacement.items());
+        //             let ch = chars.next().ok_or(Error::UnclosedPlaceholder)?;
+        //             if ch != '}' {
+        //                 return Err(Error::UnclosedPlaceholder);
+        //             }
+        //             self.state = Segment::Literal {
+        //                 literal: String::new(),
+        //                 quoted: false,
+        //             };
+        //         } else if let Segment::Literal {
+        //             ref mut literal, ..
+        //         } = self.state
+        //         {
+        //             literal.push(ch);
+        //         } else {
+        //             unreachable!()
+        //         }
+        //     }
+        // }
 
-        Self::collect_segment(self.state, &mut result)?;
+        // Self::collect_segment(self.state, &mut result)?;
 
-        Ok(result)
+        // Ok(result)
     }
 }
 

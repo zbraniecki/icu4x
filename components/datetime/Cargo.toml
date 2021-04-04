@@ -26,6 +26,7 @@ skip_optional_dependencies = true
 [dependencies]
 icu_locid = { version = "0.1", path = "../locid" }
 icu_provider = { version = "0.1", path = "../provider" }
+icu_pattern = { version = "0.1", path = "../../utils/pattern" }
 writeable = { version = "0.2", path = "../../utils/writeable" }
 litemap = { version = "0.1.1", path = "../../utils/litemap", features = ["serde"] }
 tinystr = { version = "0.4.1" }
