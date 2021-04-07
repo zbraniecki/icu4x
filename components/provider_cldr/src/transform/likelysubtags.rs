@@ -11,6 +11,7 @@ use icu_provider::prelude::*;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::marker::PhantomData;
+use tinystr::TinyStr4;
 
 /// All keys that this module is able to produce.
 pub const ALL_KEYS: [ResourceKey; 1] = [key::LIKELY_SUBTAGS_V1];
@@ -92,12 +93,12 @@ impl From<&cldr_json::Resource> for LikelySubtagsV1 {
     fn from(other: &cldr_json::Resource) -> Self {
         use icu_locid::LanguageIdentifier;
 
-        let mut language_script: Vec<(u32, u32, LanguageIdentifier)> = Vec::new();
-        let mut language_region: Vec<(u32, u32, LanguageIdentifier)> = Vec::new();
-        let mut language: Vec<(u32, LanguageIdentifier)> = Vec::new();
-        let mut script_region: Vec<(u32, u32, LanguageIdentifier)> = Vec::new();
-        let mut script: Vec<(u32, LanguageIdentifier)> = Vec::new();
-        let mut region: Vec<(u32, LanguageIdentifier)> = Vec::new();
+        let mut language_script: Vec<(TinyStr4, TinyStr4, LanguageIdentifier)> = Vec::new();
+        let mut language_region: Vec<(TinyStr4, TinyStr4, LanguageIdentifier)> = Vec::new();
+        let mut language: Vec<(TinyStr4, LanguageIdentifier)> = Vec::new();
+        let mut script_region: Vec<(TinyStr4, TinyStr4, LanguageIdentifier)> = Vec::new();
+        let mut script: Vec<(TinyStr4, LanguageIdentifier)> = Vec::new();
+        let mut region: Vec<(TinyStr4, LanguageIdentifier)> = Vec::new();
         let mut und = LanguageIdentifier::default();
 
         // Create a result LanguageIdentifier. We only need to store the delta
@@ -125,22 +126,22 @@ impl From<&cldr_json::Resource> for LikelySubtagsV1 {
             };
 
         for entry in other.supplemental.likely_subtags.iter() {
-            if let Some(lang) = entry.0.language.into_raw() {
+            if let Some(lang) = entry.0.language.into_tinystr_raw() {
                 if let Some(script) = &entry.0.script {
-                    language_script.push((lang, script.into_raw(), extract_result(entry)));
+                    language_script.push((lang, script.into_tinystr_raw(), extract_result(entry)));
                 } else if let Some(reg) = &entry.0.region {
-                    language_region.push((lang, reg.into_raw(), extract_result(entry)));
+                    language_region.push((lang, reg.into_tinystr_raw(), extract_result(entry)));
                 } else {
                     language.push((lang, extract_result(entry)));
                 }
             } else if let Some(scr) = &entry.0.script {
                 if let Some(reg) = &entry.0.region {
-                    script_region.push((scr.into_raw(), reg.into_raw(), extract_result(entry)));
+                    script_region.push((scr.into_tinystr_raw(), reg.into_tinystr_raw(), extract_result(entry)));
                 } else {
-                    script.push((scr.into_raw(), extract_result(entry)));
+                    script.push((scr.into_tinystr_raw(), extract_result(entry)));
                 }
             } else if let Some(reg) = &entry.0.region {
-                region.push((reg.into_raw(), extract_result(entry)));
+                region.push((reg.into_tinystr_raw(), extract_result(entry)));
             } else {
                 und = entry.1.clone();
             }

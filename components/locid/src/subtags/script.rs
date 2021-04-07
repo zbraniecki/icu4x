@@ -71,6 +71,10 @@ impl Script {
         self.0.into()
     }
 
+    pub fn into_tinystr_raw(self) -> TinyStr4 {
+        self.0.into()
+    }
+
     /// Constructor which takes a raw value returned by
     /// `into_raw`.
     ///

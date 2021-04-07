@@ -99,6 +99,10 @@ impl Language {
         self.0.map(Into::<u32>::into)
     }
 
+    pub fn into_tinystr_raw(self) -> Option<TinyStr4> {
+        self.0.map(Into::<TinyStr4>::into)
+    }
+
     /// Constructor which takes a raw value returned by
     /// `into_raw`.
     ///

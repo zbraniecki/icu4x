@@ -99,13 +99,13 @@ impl LocaleCanonicalizer<'_> {
             return CanonicalizationResult::Unmodified;
         }
 
-        if let Some(language) = langid.language.into_raw() {
+        if let Some(language) = langid.language.into_tinystr_raw() {
             if let Some(region) = &langid.region {
                 maximize_locale!(
                     langid,
                     self.likely_subtags.language_region,
                     language,
-                    region.into_raw()
+                    region.into_tinystr_raw()
                 );
             }
             if let Some(script) = &langid.script {
@@ -113,7 +113,7 @@ impl LocaleCanonicalizer<'_> {
                     langid,
                     self.likely_subtags.language_script,
                     language,
-                    script.into_raw()
+                    script.into_tinystr_raw()
                 );
             }
             maximize_locale!(langid, self.likely_subtags.language, language);
@@ -122,13 +122,13 @@ impl LocaleCanonicalizer<'_> {
                 maximize_locale!(
                     langid,
                     self.likely_subtags.script_region,
-                    script.into_raw(),
-                    region.into_raw()
+                    script.into_tinystr_raw(),
+                    region.into_tinystr_raw()
                 );
             }
-            maximize_locale!(langid, self.likely_subtags.script, script.into_raw());
+            maximize_locale!(langid, self.likely_subtags.script, script.into_tinystr_raw());
         } else if let Some(region) = &langid.region {
-            maximize_locale!(langid, self.likely_subtags.region, region.into_raw());
+            maximize_locale!(langid, self.likely_subtags.region, region.into_tinystr_raw());
         }
         update_langid(&self.likely_subtags.und, langid)
     }
