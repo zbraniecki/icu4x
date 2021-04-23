@@ -285,3 +285,51 @@ fn constructing_datetime_format_with_time_zone_pattern_symbols_is_err() {
 
     assert!(result.is_err());
 }
+
+#[test]
+fn datetime_with_preferences() {
+    use icu_datetime::{
+        mock::datetime::MockDateTime,
+        options::{length, preferences},
+    };
+    use icu_locid::Locale;
+    use icu_locid_macros::langid;
+
+    let locale: Locale = langid!("en").into();
+    let provider = icu_testdata::get_provider();
+
+    let date: MockDateTime = "2021-04-21T13:21:000".parse()
+        .expect("Failed to parse a date");
+
+    {
+        // First, let's verify that "en" formatted time uses
+        // 12h by default and has `PM` symbol.
+        let options = length::Bag {
+            date: None,
+            time: Some(length::Time::Short),
+            ..Default::default()
+        };
+        let dtf = DateTimeFormat::try_new(locale.clone(), &provider, &options.into())
+            .expect("Failed to construct a DateTimeFormat instance");
+
+        let result = dtf.format_to_string(&date);
+        assert_eq!(result, "1:21 PM");
+    }
+
+    {
+        // And now, verify that if we set the preference to use 23h clock, it is respected.
+        let options = length::Bag {
+            date: None,
+            time: Some(length::Time::Short),
+            preferences: Some(preferences::Bag {
+                hour_cycle: Some(preferences::HourCycle::H23),
+            }),
+            ..Default::default()
+        };
+        let dtf = DateTimeFormat::try_new(locale, &provider, &options.into())
+            .expect("Failed to construct a DateTimeFormat instance");
+
+        let result = dtf.format_to_string(&date);
+        assert_eq!(result, "13:21");
+    }
+}

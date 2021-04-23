@@ -5,7 +5,10 @@
 mod error;
 mod parser;
 
-use crate::fields::{self, Field, FieldLength, FieldSymbol};
+use crate::{
+    fields::{self, Field, FieldLength, FieldSymbol},
+    options::preferences,
+};
 pub use error::Error;
 use parser::Parser;
 use std::{convert::TryFrom, fmt};
@@ -112,6 +115,19 @@ impl Pattern {
 
     pub(super) fn most_granular_time(&self) -> Option<TimeGranularity> {
         self.time_granularity
+    }
+
+    pub(crate) fn apply_preferences(&mut self, preferences_bag: &preferences::Bag) {
+        self.items.retain(|pattern_item| {
+            if let PatternItem::Field(field) = pattern_item {
+                match field.symbol {
+                    FieldSymbol::DayPeriod(..) => false,
+                    _ => true
+                }
+            } else {
+                true
+            }
+        });
     }
 }
 

@@ -122,6 +122,7 @@ impl DateTimePatterns for provider::gregory::PatternsV1 {
     }
 
     fn get_pattern_for_time_length(&self, length: length::Time) -> Result<Pattern> {
+        use crate::options::preferences;
         let time = &self.time;
         let s = match length {
             length::Time::Full => &time.full,
@@ -129,7 +130,11 @@ impl DateTimePatterns for provider::gregory::PatternsV1 {
             length::Time::Medium => &time.medium,
             length::Time::Short => &time.short,
         };
-        Ok(Pattern::from_bytes(s)?)
+        let mut pattern = Pattern::from_bytes(s)?;
+        pattern.apply_preferences(&preferences::Bag {
+            hour_cycle: Some(preferences::HourCycle::H12),
+        });
+        Ok(pattern)
     }
 }
 
