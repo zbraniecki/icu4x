@@ -55,6 +55,7 @@ Document | Summary
 [wasm_vs_transpiler.md](research/wasm_vs_transpiler.md) | We've considered two approaches to a problem of write logic once, deploy it on multiple platforms/languages with minimal effort.
 [wrapper_layer.md](research/wrapper_layer.md) | A key piece of rolling out ergonomic ICU4X APIs for Rust and other target languages is the *wrapper layer*: code that sits between the client and the lower-level ICU4X libraries.  This document explains the design behind the ICU4X wrapper layer.
 [ecosystem.md](research/ecosystem.md) | This document tracks the crates that already exist in the ecosystem that cover functionality that we may wish to cover in ICU4X.
+[performance.md](research/performance.md) | Overview of continous performance comparison against reference implementations and alternatives.
 
 ## Posts
 
