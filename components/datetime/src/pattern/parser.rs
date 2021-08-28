@@ -98,7 +98,7 @@ impl<'p> Parser<'p> {
         Ok(())
     }
 
-    pub fn parse(mut self) -> Result<Vec<PatternItem>, Error> {
+    pub fn parse(mut self) -> Result<Vec<PatternItem<'p>>, Error> {
         let mut chars = self.source.chars().peekable();
         let mut result = vec![];
 
@@ -144,8 +144,8 @@ impl<'p> Parser<'p> {
 
     pub fn parse_placeholders(
         mut self,
-        mut replacements: Vec<Pattern>,
-    ) -> Result<Vec<PatternItem>, Error> {
+        mut replacements: Vec<Pattern<'p>>,
+    ) -> Result<Vec<PatternItem<'p>>, Error> {
         let mut chars = self.source.chars().peekable();
         let mut result = vec![];
 

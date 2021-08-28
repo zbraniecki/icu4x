@@ -13,25 +13,28 @@ use alloc::borrow::Cow;
 
 type Result<T> = core::result::Result<T, DateTimeFormatError>;
 
-pub trait DateTimePatterns {
-    fn get_pattern_for_options(&self, options: &DateTimeFormatOptions) -> Result<Option<Pattern>>;
+pub trait DateTimePatterns<'data> {
+    fn get_pattern_for_options(
+        &self,
+        options: &DateTimeFormatOptions,
+    ) -> Result<Option<Pattern<'data>>>;
     fn get_pattern_for_components_bag(
         &self,
         components: &components::Bag,
-    ) -> Result<Option<Pattern>>;
-    fn get_pattern_for_length_bag(&self, length: &length::Bag) -> Result<Option<Pattern>>;
-    fn get_pattern_for_date_length(&self, length: length::Date) -> Result<Pattern>;
+    ) -> Result<Option<Pattern<'data>>>;
+    fn get_pattern_for_length_bag(&self, length: &length::Bag) -> Result<Option<Pattern<'data>>>;
+    fn get_pattern_for_date_length(&self, length: length::Date) -> Result<Pattern<'data>>;
     fn get_pattern_for_time_length(
         &self,
         length: length::Time,
         preferences: &Option<preferences::Bag>,
-    ) -> Result<Pattern>;
+    ) -> Result<Pattern<'data>>;
     fn get_pattern_for_datetime_length(
         &self,
         length: length::Date,
-        date: Pattern,
-        time: Pattern,
-    ) -> Result<Pattern>;
+        date: Pattern<'data>,
+        time: Pattern<'data>,
+    ) -> Result<Pattern<'data>>;
 }
 
 pub trait DateTimeSymbols {
@@ -56,8 +59,11 @@ pub trait DateTimeSymbols {
     ) -> &Cow<str>;
 }
 
-impl DateTimePatterns for provider::gregory::DatePatternsV1 {
-    fn get_pattern_for_options(&self, options: &DateTimeFormatOptions) -> Result<Option<Pattern>> {
+impl<'data> DateTimePatterns<'data> for provider::gregory::DatePatternsV1<'data> {
+    fn get_pattern_for_options(
+        &self,
+        options: &DateTimeFormatOptions,
+    ) -> Result<Option<Pattern<'data>>> {
         match options {
             DateTimeFormatOptions::Length(bag) => self.get_pattern_for_length_bag(bag),
             DateTimeFormatOptions::Components(bag) => self.get_pattern_for_components_bag(bag),
@@ -67,7 +73,7 @@ impl DateTimePatterns for provider::gregory::DatePatternsV1 {
     fn get_pattern_for_components_bag(
         &self,
         components: &components::Bag,
-    ) -> Result<Option<Pattern>> {
+    ) -> Result<Option<Pattern<'data>>> {
         // Not all skeletons are currently supported.
         let requested_fields = components.to_vec_fields();
         Ok(
@@ -85,7 +91,7 @@ impl DateTimePatterns for provider::gregory::DatePatternsV1 {
         )
     }
 
-    fn get_pattern_for_length_bag(&self, length: &length::Bag) -> Result<Option<Pattern>> {
+    fn get_pattern_for_length_bag(&self, length: &length::Bag) -> Result<Option<Pattern<'data>>> {
         match (length.date, length.time) {
             (None, None) => Ok(None),
             (None, Some(time_length)) => self
@@ -102,7 +108,7 @@ impl DateTimePatterns for provider::gregory::DatePatternsV1 {
         }
     }
 
-    fn get_pattern_for_date_length(&self, length: length::Date) -> Result<Pattern> {
+    fn get_pattern_for_date_length(&self, length: length::Date) -> Result<Pattern<'data>> {
         let date = &self.date;
         let s = match length {
             length::Date::Full => &date.full,
@@ -110,23 +116,24 @@ impl DateTimePatterns for provider::gregory::DatePatternsV1 {
             length::Date::Medium => &date.medium,
             length::Date::Short => &date.short,
         };
-        Ok(Pattern::from_bytes(s)?)
+        Ok(s.0.clone())
     }
 
     fn get_pattern_for_datetime_length(
         &self,
         length: length::Date,
-        date: Pattern,
-        time: Pattern,
-    ) -> Result<Pattern> {
-        let datetime = &self.datetime;
-        let s = match length {
-            length::Date::Full => &datetime.length_patterns.full,
-            length::Date::Long => &datetime.length_patterns.long,
-            length::Date::Medium => &datetime.length_patterns.medium,
-            length::Date::Short => &datetime.length_patterns.short,
-        };
-        Ok(Pattern::from_bytes_combination(s, date, time)?)
+        date: Pattern<'data>,
+        time: Pattern<'data>,
+    ) -> Result<Pattern<'data>> {
+        panic!();
+        // let datetime = &self.datetime;
+        // let s = match length {
+        //     length::Date::Full => &datetime.length_patterns.full,
+        //     length::Date::Long => &datetime.length_patterns.long,
+        //     length::Date::Medium => &datetime.length_patterns.medium,
+        //     length::Date::Short => &datetime.length_patterns.short,
+        // };
+        // Ok(Pattern::from_bytes_combination(s, date, time)?)
     }
 
     /// Look up the proper pre-computed pattern for a given length. If a preference for an hour
@@ -136,7 +143,7 @@ impl DateTimePatterns for provider::gregory::DatePatternsV1 {
         &self,
         length: length::Time,
         preferences: &Option<preferences::Bag>,
-    ) -> Result<Pattern> {
+    ) -> Result<Pattern<'data>> {
         // Determine the coarse hour cycle patterns to use from either the preference bag,
         // or the preferred hour cycle for the locale.
         let time = if let Some(preferences::Bag {
@@ -154,12 +161,12 @@ impl DateTimePatterns for provider::gregory::DatePatternsV1 {
             }
         };
 
-        let mut pattern = Pattern::from_bytes(match length {
-            length::Time::Full => &time.full,
-            length::Time::Long => &time.long,
-            length::Time::Medium => &time.medium,
-            length::Time::Short => &time.short,
-        })?;
+        let mut pattern = match length {
+            length::Time::Full => time.full.0.clone(),
+            length::Time::Long => time.long.0.clone(),
+            length::Time::Medium => time.medium.0.clone(),
+            length::Time::Short => time.short.0.clone(),
+        };
 
         if let Some(preferences::Bag {
             hour_cycle: Some(hour_cycle_pref),

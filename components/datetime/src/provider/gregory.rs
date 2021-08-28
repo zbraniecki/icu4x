@@ -4,6 +4,7 @@
 
 use crate::pattern;
 use alloc::borrow::Cow;
+use icu_provider::prelude::*;
 use icu_provider::yoke::{self, *};
 
 #[icu_provider::data_struct]
@@ -28,23 +29,27 @@ pub struct DateSymbolsV1 {
     derive(serde::Serialize, serde::Deserialize)
 )]
 #[yoke(cloning_zcf)]
-pub struct DatePatternsV1 {
-    pub date: patterns::LengthPatternsV1,
+pub struct DatePatternsV1<'data> {
+    #[serde(borrow)]
+    pub date: patterns::LengthPatternsV1<'data>,
 
     /// These patterns are common uses of time formatting, broken down by the length of the
     /// pattern. Users can override the hour cycle with a preference, so there are two
     /// pattern groups stored here. Note that the pattern will contain either h11 or h12.
-    pub time_h11_h12: patterns::LengthPatternsV1,
+    #[serde(borrow)]
+    pub time_h11_h12: patterns::LengthPatternsV1<'data>,
 
     /// These patterns are common uses of time formatting, broken down by the length of the
     /// pattern. Users can override the hour cycle with a preference, so there are two
     /// pattern groups stored here. Note that the pattern will contain either h23 or h24.
-    pub time_h23_h24: patterns::LengthPatternsV1,
+    #[serde(borrow)]
+    pub time_h23_h24: patterns::LengthPatternsV1<'data>,
 
     /// By default a locale will prefer one hour cycle type over another.
     pub preferred_hour_cycle: pattern::CoarseHourCycle,
 
-    pub datetime: patterns::DateTimeFormatsV1,
+    #[serde(borrow)]
+    pub datetime: patterns::DateTimeFormatsV1<'data>,
 }
 macro_rules! symbols {
         ($name: ident, $expr: ty) => {
@@ -159,11 +164,27 @@ pub mod patterns {
         feature = "provider_serde",
         derive(serde::Serialize, serde::Deserialize)
     )]
-    pub struct LengthPatternsV1 {
-        pub full: Cow<'static, str>,
-        pub long: Cow<'static, str>,
-        pub medium: Cow<'static, str>,
-        pub short: Cow<'static, str>,
+    pub struct LengthPatternsV1<'data> {
+        #[serde(borrow)]
+        pub full: PatternV1<'data>,
+        #[serde(borrow)]
+        pub long: PatternV1<'data>,
+        #[serde(borrow)]
+        pub medium: PatternV1<'data>,
+        #[serde(borrow)]
+        pub short: PatternV1<'data>,
+    }
+
+    #[derive(Debug, PartialEq, Clone, Default)]
+    #[cfg_attr(
+        feature = "provider_serde",
+        derive(serde::Serialize, serde::Deserialize)
+    )]
+    pub struct LengthDTPatternsV1<'data> {
+        pub full: Cow<'data, str>,
+        pub long: Cow<'data, str>,
+        pub medium: Cow<'data, str>,
+        pub short: Cow<'data, str>,
     }
 
     /// This struct is a public wrapper around the internal [`Pattern`] struct. This allows
@@ -172,29 +193,40 @@ pub mod patterns {
     ///
     /// The [`Pattern`] is an "exotic type" in the serialization process, and handles its own
     /// custom serialization practices.
+    #[icu_provider::data_struct]
     #[derive(Debug, PartialEq, Clone, Default)]
     #[cfg_attr(
         feature = "provider_serde",
         derive(serde::Serialize, serde::Deserialize)
     )]
-    pub struct PatternV1(pub Pattern);
+    #[yoke(cloning_zcf)]
+    pub struct PatternV1<'data>(#[serde(borrow)] pub Pattern<'data>);
 
-    impl From<Pattern> for PatternV1 {
-        fn from(pattern: Pattern) -> Self {
+    impl<'data> From<Pattern<'data>> for PatternV1<'data> {
+        fn from(pattern: Pattern<'data>) -> Self {
             Self(pattern)
         }
     }
 
-    impl TryFrom<&str> for PatternV1 {
+    impl<'data> TryFrom<&'data str> for PatternV1<'data> {
         type Error = pattern::Error;
 
-        fn try_from(pattern_string: &str) -> Result<Self, Self::Error> {
+        fn try_from(pattern_string: &'data str) -> Result<Self, Self::Error> {
             let pattern = Pattern::from_bytes(pattern_string);
             match pattern {
                 Ok(pattern) => Ok(Self::from(pattern)),
                 Err(err) => Err(err),
             }
         }
+    }
+
+    /// Helper struct used to allow for projection of `DataPayload<DatePatternsV1>` to
+    /// `DataPayload<PatternV1>`.
+    pub struct PatternFromPatternsV1Marker;
+
+    impl<'data> DataMarker<'data> for PatternFromPatternsV1Marker {
+        type Yokeable = PatternV1<'static>;
+        type Cart = DatePatternsV1<'data>;
     }
 
     /// This struct is a public wrapper around the internal `Skeleton` struct. This allows
@@ -226,15 +258,17 @@ pub mod patterns {
         feature = "provider_serde",
         derive(serde::Serialize, serde::Deserialize)
     )]
-    pub struct SkeletonsV1(pub LiteMap<SkeletonV1, PatternV1>);
+    pub struct SkeletonsV1<'data>(#[serde(borrow)] pub LiteMap<SkeletonV1, PatternV1<'data>>);
 
     #[derive(Debug, PartialEq, Clone, Default)]
     #[cfg_attr(
         feature = "provider_serde",
         derive(serde::Serialize, serde::Deserialize)
     )]
-    pub struct DateTimeFormatsV1 {
-        pub length_patterns: LengthPatternsV1,
-        pub skeletons: SkeletonsV1,
+    pub struct DateTimeFormatsV1<'data> {
+        #[serde(borrow)]
+        pub length_patterns: LengthDTPatternsV1<'data>,
+        #[serde(borrow)]
+        pub skeletons: SkeletonsV1<'data>,
     }
 }

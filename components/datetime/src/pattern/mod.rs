@@ -31,12 +31,12 @@ use serde::{
     feature = "provider_serde",
     derive(serde::Serialize, serde::Deserialize)
 )]
-pub enum PatternItem {
+pub enum PatternItem<'data> {
     Field(fields::Field),
-    Literal(String),
+    Literal(std::borrow::Cow<'data, str>),
 }
 
-impl From<(FieldSymbol, FieldLength)> for PatternItem {
+impl From<(FieldSymbol, FieldLength)> for PatternItem<'_> {
     fn from(input: (FieldSymbol, FieldLength)) -> Self {
         Self::Field(Field {
             symbol: input.0,
@@ -45,7 +45,7 @@ impl From<(FieldSymbol, FieldLength)> for PatternItem {
     }
 }
 
-impl TryFrom<(FieldSymbol, u8)> for PatternItem {
+impl TryFrom<(FieldSymbol, u8)> for PatternItem<'_> {
     type Error = Error;
     fn try_from(input: (FieldSymbol, u8)) -> Result<Self, Self::Error> {
         let length =
@@ -57,15 +57,15 @@ impl TryFrom<(FieldSymbol, u8)> for PatternItem {
     }
 }
 
-impl<'p> From<&str> for PatternItem {
-    fn from(input: &str) -> Self {
+impl<'data> From<&'data str> for PatternItem<'data> {
+    fn from(input: &'data str) -> Self {
         Self::Literal(input.into())
     }
 }
 
-impl<'p> From<String> for PatternItem {
+impl From<String> for PatternItem<'_> {
     fn from(input: String) -> Self {
-        Self::Literal(input)
+        Self::Literal(input.into())
     }
 }
 
@@ -83,8 +83,8 @@ pub(super) enum TimeGranularity {
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
-pub struct Pattern {
-    items: Vec<PatternItem>,
+pub struct Pattern<'data> {
+    items: Vec<PatternItem<'data>>,
     time_granularity: Option<TimeGranularity>,
 }
 
@@ -102,21 +102,25 @@ fn get_time_granularity(item: &PatternItem) -> Option<TimeGranularity> {
     }
 }
 
-impl Pattern {
-    pub fn items(&self) -> &[PatternItem] {
+impl<'data> Pattern<'data> {
+    pub fn items(&self) -> &[PatternItem<'data>] {
         &self.items
     }
 
-    pub fn items_mut(&mut self) -> &mut [PatternItem] {
+    pub fn items_mut(&mut self) -> &mut [PatternItem<'data>] {
         &mut self.items
     }
 
-    pub fn from_bytes(input: &str) -> Result<Self, Error> {
+    pub fn from_bytes(input: &'data str) -> Result<Self, Error> {
         Parser::new(input).parse().map(Self::from)
     }
 
     // TODO(#277): This should be turned into a utility for all ICU4X.
-    pub fn from_bytes_combination(input: &str, date: Self, time: Self) -> Result<Self, Error> {
+    pub fn from_bytes_combination(
+        input: &'data str,
+        date: Self,
+        time: Self,
+    ) -> Result<Self, Error> {
         Parser::new(input)
             .parse_placeholders(vec![time, date])
             .map(Self::from)
@@ -127,8 +131,8 @@ impl Pattern {
     }
 }
 
-impl From<Vec<PatternItem>> for Pattern {
-    fn from(items: Vec<PatternItem>) -> Self {
+impl<'data> From<Vec<PatternItem<'data>>> for Pattern<'data> {
+    fn from(items: Vec<PatternItem<'data>>) -> Self {
         Self {
             time_granularity: items.iter().filter_map(get_time_granularity).max(),
             items,
@@ -141,7 +145,7 @@ impl From<Vec<PatternItem>> for Pattern {
 /// this was not done, as this code would need to implement the [`write_len()`] method, which would
 /// need to duplicate the branching logic of the [`fmt`](std::fmt) method here. This code is used in generating
 /// the data providers and is not as performance sensitive.
-impl fmt::Display for Pattern {
+impl<'data> fmt::Display for Pattern<'data> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         for pattern_item in self.items().iter() {
             match pattern_item {
@@ -197,31 +201,33 @@ impl fmt::Display for Pattern {
                         formatter.write_str(literal)?;
                     }
                 }
+                _ => {}
             }
         }
         Ok(())
     }
 }
 
-impl FromIterator<PatternItem> for Pattern {
-    fn from_iter<I: IntoIterator<Item = PatternItem>>(iter: I) -> Self {
+impl<'data> FromIterator<PatternItem<'data>> for Pattern<'data> {
+    fn from_iter<I: IntoIterator<Item = PatternItem<'data>>>(iter: I) -> Self {
         Self::from(iter.into_iter().collect::<Vec<_>>())
     }
 }
 
 #[cfg(feature = "provider_serde")]
 #[allow(clippy::upper_case_acronyms)]
-struct DeserializePatternUTS35String;
+#[derive(Default)]
+struct DeserializePatternUTS35String<'data>(std::marker::PhantomData<&'data str>);
 
 #[cfg(feature = "provider_serde")]
-impl<'de> de::Visitor<'de> for DeserializePatternUTS35String {
-    type Value = Pattern;
+impl<'de: 'data, 'data> de::Visitor<'de> for DeserializePatternUTS35String<'data> {
+    type Value = Pattern<'data>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "Expected to find a valid pattern.")
     }
 
-    fn visit_str<E>(self, pattern_string: &str) -> Result<Self::Value, E>
+    fn visit_borrowed_str<E>(self, pattern_string: &'de str) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
@@ -236,17 +242,18 @@ impl<'de> de::Visitor<'de> for DeserializePatternUTS35String {
 }
 
 #[cfg(feature = "provider_serde")]
-struct DeserializePatternBincode;
+#[derive(Default)]
+struct DeserializePatternBincode<'data>(std::marker::PhantomData<&'data str>);
 
 #[cfg(feature = "provider_serde")]
-impl<'de> de::Visitor<'de> for DeserializePatternBincode {
-    type Value = Pattern;
+impl<'de, 'data> de::Visitor<'de> for DeserializePatternBincode<'data> {
+    type Value = Pattern<'data>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "Unable to deserialize a bincode Pattern.")
     }
 
-    fn visit_seq<V>(self, mut seq: V) -> Result<Pattern, V::Error>
+    fn visit_seq<V>(self, mut seq: V) -> Result<Pattern<'data>, V::Error>
     where
         V: de::SeqAccess<'de>,
     {
@@ -259,21 +266,21 @@ impl<'de> de::Visitor<'de> for DeserializePatternBincode {
 }
 
 #[cfg(feature = "provider_serde")]
-impl<'de> Deserialize<'de> for Pattern {
+impl<'de: 'data, 'data> Deserialize<'de> for Pattern<'data> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         if deserializer.is_human_readable() {
-            deserializer.deserialize_str(DeserializePatternUTS35String)
+            deserializer.deserialize_str(DeserializePatternUTS35String::default())
         } else {
-            deserializer.deserialize_seq(DeserializePatternBincode)
+            deserializer.deserialize_seq(DeserializePatternBincode::default())
         }
     }
 }
 
 #[cfg(feature = "provider_serde")]
-impl Serialize for Pattern {
+impl<'data> Serialize for Pattern<'data> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,

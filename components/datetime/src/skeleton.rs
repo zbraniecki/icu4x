@@ -18,7 +18,7 @@ use crate::{
     fields::{self, Field, FieldLength, FieldSymbol},
     options::{length, preferences},
     pattern::{Pattern, PatternItem},
-    provider::gregory::patterns::{LengthPatternsV1, PatternV1, SkeletonV1, SkeletonsV1},
+    provider::gregory::patterns::{LengthDTPatternsV1, PatternV1, SkeletonV1, SkeletonsV1},
 };
 
 #[cfg(feature = "provider_serde")]
@@ -215,8 +215,8 @@ impl TryFrom<&str> for Skeleton {
 /// be exposed as a public API for end users.
 #[doc(hidden)]
 #[cfg(feature = "provider_transform_internals")]
-impl From<&Pattern> for Skeleton {
-    fn from(pattern: &Pattern) -> Self {
+impl From<&Pattern<'_>> for Skeleton {
+    fn from(pattern: &Pattern<'_>) -> Self {
         let mut fields: SmallVec<[fields::Field; 5]> = SmallVec::new();
         for item in pattern.items() {
             if let crate::pattern::PatternItem::Field(field) = item {
@@ -268,14 +268,14 @@ impl From<&Pattern> for Skeleton {
 /// Represents a specific pattern that is available for a given locale.
 /// A [`Skeleton`] is used to match against to find the best pattern.
 #[derive(Debug, PartialEq, Clone)]
-pub struct AvailableFormatPattern<'a> {
+pub struct AvailableFormatPattern<'a, 'data> {
     /// The skeleton that is used to match against.
     skeleton: &'a Skeleton,
-    pub pattern: &'a Pattern,
+    pub pattern: &'a Pattern<'data>,
 }
 
-impl<'a> From<(&'a SkeletonV1, &'a PatternV1)> for AvailableFormatPattern<'a> {
-    fn from(tuple: (&'a SkeletonV1, &'a PatternV1)) -> Self {
+impl<'a, 'data> From<(&'a SkeletonV1, &'a PatternV1<'data>)> for AvailableFormatPattern<'a, 'data> {
+    fn from(tuple: (&'a SkeletonV1, &'a PatternV1<'data>)) -> Self {
         let (skeleton_v1, pattern_v1) = tuple;
 
         AvailableFormatPattern {
@@ -457,13 +457,13 @@ fn naively_apply_hour_cycle_preferences(
 ///         the desired fields, even if the provider data doesn't completely match. This
 ///         configuration option makes it so that the final pattern won't have additional work
 ///         done to mutate it to match the fields. It will prefer the actual matched pattern.
-pub fn create_best_pattern_for_fields<'a>(
-    skeletons: &'a SkeletonsV1,
-    length_patterns: &LengthPatternsV1,
+pub fn create_best_pattern_for_fields<'a, 'data>(
+    skeletons: &'a SkeletonsV1<'data>,
+    length_patterns: &LengthDTPatternsV1,
     fields: &[Field],
     preferences: &Option<preferences::Bag>,
     prefer_matched_pattern: bool,
-) -> BestSkeleton<Pattern> {
+) -> BestSkeleton<Pattern<'data>> {
     let first_pattern_match =
         get_best_available_format_pattern(skeletons, fields, prefer_matched_pattern);
 
@@ -526,62 +526,63 @@ pub fn create_best_pattern_for_fields<'a>(
     }
 
     // Determine how to combine the date and time.
-    let pattern: Option<Pattern> = match (date_pattern, time_pattern) {
-        (Some(date_pattern), Some(time_pattern)) => {
-            let month_field = fields
-                .iter()
-                .find(|f| matches!(f.symbol, FieldSymbol::Month(_)));
+    //let pattern: Option<Pattern> = match (date_pattern, time_pattern) {
+    //    (Some(date_pattern), Some(time_pattern)) => {
+    //        let month_field = fields
+    //            .iter()
+    //            .find(|f| matches!(f.symbol, FieldSymbol::Month(_)));
 
-            // Per UTS-35, choose a "length" pattern for combining the date and time.
-            // https://unicode.org/reports/tr35/tr35-dates.html#Matching_Skeletons
-            //
-            // 1. If the requested date fields include Wide month and weekday name of any length, use length::Date::Full
-            // 2. Otherwise, if the requested date fields include wide month, use length::Date::Long
-            // 3. Otherwise, if the requested date fields include abbreviated month, use length::Date::Medium
-            // 4. Otherwise use length::Date::Short
-            let length = match month_field {
-                Some(field) => match field.length {
-                    FieldLength::Wide => {
-                        let weekday = fields
-                            .iter()
-                            .find(|f| matches!(f.symbol, FieldSymbol::Weekday(_)));
+    //        // Per UTS-35, choose a "length" pattern for combining the date and time.
+    //        // https://unicode.org/reports/tr35/tr35-dates.html#Matching_Skeletons
+    //        //
+    //        // 1. If the requested date fields include Wide month and weekday name of any length, use length::Date::Full
+    //        // 2. Otherwise, if the requested date fields include wide month, use length::Date::Long
+    //        // 3. Otherwise, if the requested date fields include abbreviated month, use length::Date::Medium
+    //        // 4. Otherwise use length::Date::Short
+    //        let length = match month_field {
+    //            Some(field) => match field.length {
+    //                FieldLength::Wide => {
+    //                    let weekday = fields
+    //                        .iter()
+    //                        .find(|f| matches!(f.symbol, FieldSymbol::Weekday(_)));
 
-                        if weekday.is_some() {
-                            length::Date::Full
-                        } else {
-                            length::Date::Long
-                        }
-                    }
-                    FieldLength::Abbreviated => length::Date::Medium,
-                    _ => length::Date::Short,
-                },
-                None => length::Date::Short,
-            };
+    //                    if weekday.is_some() {
+    //                        length::Date::Full
+    //                    } else {
+    //                        length::Date::Long
+    //                    }
+    //                }
+    //                FieldLength::Abbreviated => length::Date::Medium,
+    //                _ => length::Date::Short,
+    //            },
+    //            None => length::Date::Short,
+    //        };
 
-            let bytes = match length {
-                length::Date::Full => &length_patterns.full,
-                length::Date::Long => &length_patterns.long,
-                length::Date::Medium => &length_patterns.medium,
-                length::Date::Short => &length_patterns.short,
-            };
+    //        let bytes = match length {
+    //            length::Date::Full => &length_patterns.full,
+    //            length::Date::Long => &length_patterns.long,
+    //            length::Date::Medium => &length_patterns.medium,
+    //            length::Date::Short => &length_patterns.short,
+    //        };
 
-            Some(Pattern::from_bytes_combination(bytes, date_pattern, time_pattern).expect("TODO"))
-        }
-        (None, Some(pattern)) => Some(pattern),
-        (Some(pattern), None) => Some(pattern),
-        (None, None) => None,
-    };
+    //        Some(Pattern::from_bytes_combination(bytes, date_pattern, time_pattern).expect("TODO"))
+    //    }
+    //    (None, Some(pattern)) => Some(pattern),
+    //    (Some(pattern), None) => Some(pattern),
+    //    (None, None) => None,
+    //};
 
-    match pattern {
-        Some(pattern) => {
-            if date_missing_or_extra || time_missing_or_extra {
-                BestSkeleton::MissingOrExtraFields(pattern)
-            } else {
-                BestSkeleton::AllFieldsMatch(pattern)
-            }
-        }
-        None => BestSkeleton::NoMatch,
-    }
+    panic!();
+    // match pattern {
+    //     Some(pattern) => {
+    //         if date_missing_or_extra || time_missing_or_extra {
+    //             BestSkeleton::MissingOrExtraFields(pattern)
+    //         } else {
+    //             BestSkeleton::AllFieldsMatch(pattern)
+    //         }
+    //     }
+    //     None => BestSkeleton::NoMatch,
+    // }
 }
 
 struct FieldsByType {
@@ -640,11 +641,11 @@ fn group_fields_by_type(fields: &[Field]) -> FieldsByType {
 ///  * 2.6.2.2 Missing Skeleton Fields
 ///    - TODO(#586) - Using the CLDR appendItems field. Note: There is not agreement yet on how
 ///      much of this step to implement. See the issue for more information.
-pub fn get_best_available_format_pattern(
-    skeletons: &SkeletonsV1,
+pub fn get_best_available_format_pattern<'data>(
+    skeletons: &SkeletonsV1<'data>,
     fields: &[Field],
     prefer_matched_pattern: bool,
-) -> BestSkeleton<Pattern> {
+) -> BestSkeleton<Pattern<'data>> {
     let mut closest_format_pattern = None;
     let mut closest_distance: u32 = u32::MAX;
     let mut closest_missing_fields = 0;
@@ -779,9 +780,9 @@ pub fn get_best_available_format_pattern(
     BestSkeleton::AllFieldsMatch(expanded_pattern)
 }
 
-pub fn get_available_format_patterns<'a>(
-    skeletons: &'a SkeletonsV1,
-) -> impl Iterator<Item = AvailableFormatPattern> + 'a {
+pub fn get_available_format_patterns<'a, 'data>(
+    skeletons: &'a SkeletonsV1<'data>,
+) -> impl Iterator<Item = AvailableFormatPattern<'a, 'data>> + 'a {
     skeletons.0.iter().map(AvailableFormatPattern::from)
 }
 

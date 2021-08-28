@@ -125,43 +125,44 @@ impl<'data> ZonedDateTimeFormat<'data> {
                 })?
                 .take_payload()?;
 
-        let pattern = pattern_data
-            .get()
-            .get_pattern_for_options(options)?
-            .unwrap_or_default();
+        panic!();
+        // let pattern = pattern_data
+        //     .get()
+        //     .get_pattern_for_options(options)?
+        //     .unwrap_or_default();
 
-        let requires_data = datetime::analyze_pattern(&pattern, true)
-            .map_err(|field| DateTimeFormatError::UnsupportedField(field.symbol))?;
+        // let requires_data = datetime::analyze_pattern(&pattern, true)
+        //     .map_err(|field| DateTimeFormatError::UnsupportedField(field.symbol))?;
 
-        let symbols_data = if requires_data {
-            Some(
-                date_provider
-                    .load_payload(&DataRequest {
-                        resource_path: ResourcePath {
-                            key: provider::key::GREGORY_DATE_SYMBOLS_V1,
-                            options: ResourceOptions {
-                                variant: None,
-                                langid: Some(locale.clone().into()),
-                            },
-                        },
-                    })?
-                    .take_payload()?,
-            )
-        } else {
-            None
-        };
+        // let symbols_data = if requires_data {
+        //     Some(
+        //         date_provider
+        //             .load_payload(&DataRequest {
+        //                 resource_path: ResourcePath {
+        //                     key: provider::key::GREGORY_DATE_SYMBOLS_V1,
+        //                     options: ResourceOptions {
+        //                         variant: None,
+        //                         langid: Some(locale.clone().into()),
+        //                     },
+        //                 },
+        //             })?
+        //             .take_payload()?,
+        //     )
+        // } else {
+        //     None
+        // };
 
-        let datetime_format = DateTimeFormat::new(locale, pattern, symbols_data);
-        let time_zone_format = TimeZoneFormat::try_new(
-            datetime_format.locale.clone(),
-            datetime_format.pattern.clone(),
-            zone_provider,
-        )?;
+        // let datetime_format = DateTimeFormat::new(locale, pattern, symbols_data, None);
+        // let time_zone_format = TimeZoneFormat::try_new(
+        //     datetime_format.locale.clone(),
+        //     datetime_format.pattern.clone(),
+        //     zone_provider,
+        // )?;
 
-        Ok(Self {
-            datetime_format,
-            time_zone_format,
-        })
+        // Ok(Self {
+        //     datetime_format,
+        //     time_zone_format,
+        // })
     }
 
     /// Takes a [`ZonedDateTimeInput`] implementer and returns an instance of a [`FormattedZonedDateTime`]

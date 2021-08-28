@@ -43,35 +43,50 @@ use writeable::Writeable;
 ///
 /// let _ = format!("Date: {}", formatted_date);
 /// ```
-pub struct FormattedDateTime<'l, T>
+pub struct FormattedDateTime<'l, 'data, T>
 where
     T: DateTimeInput,
 {
-    pub(crate) pattern: &'l Pattern,
+    pub(crate) pattern: &'l icu_provider::prelude::DataPayload<
+        'data,
+        provider::gregory::patterns::PatternFromPatternsV1Marker,
+    >,
     pub(crate) symbols: Option<&'l provider::gregory::DateSymbolsV1>,
     pub(crate) datetime: &'l T,
     pub(crate) locale: &'l Locale,
 }
 
-impl<'l, T> Writeable for FormattedDateTime<'l, T>
+impl<'l, 'data, T> Writeable for FormattedDateTime<'l, 'data, T>
 where
     T: DateTimeInput,
 {
     fn write_to<W: fmt::Write + ?Sized>(&self, sink: &mut W) -> fmt::Result {
-        write_pattern(self.pattern, self.symbols, self.datetime, self.locale, sink)
-            .map_err(|_| core::fmt::Error)
+        write_pattern(
+            &self.pattern.get().0,
+            self.symbols,
+            self.datetime,
+            self.locale,
+            sink,
+        )
+        .map_err(|_| core::fmt::Error)
     }
 
     // TODO(#489): Implement write_len
 }
 
-impl<'l, T> fmt::Display for FormattedDateTime<'l, T>
+impl<'l, 'data, T> fmt::Display for FormattedDateTime<'l, 'data, T>
 where
     T: DateTimeInput,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_pattern(self.pattern, self.symbols, self.datetime, self.locale, f)
-            .map_err(|_| core::fmt::Error)
+        write_pattern(
+            &self.pattern.get().0,
+            self.symbols,
+            self.datetime,
+            self.locale,
+            f,
+        )
+        .map_err(|_| core::fmt::Error)
     }
 }
 
@@ -253,7 +268,10 @@ where
 
 // This function determins whether the struct will load symbols data.
 // Keep it in sync with the `write_field` use of symbols.
-pub fn analyze_pattern(pattern: &Pattern, supports_time_zones: bool) -> Result<bool, &Field> {
+pub fn analyze_pattern<'a, 'data>(
+    pattern: &'a Pattern<'data>,
+    supports_time_zones: bool,
+) -> Result<bool, &'a Field> {
     let fields = pattern.items().iter().filter_map(|p| match p {
         PatternItem::Field(field) => Some(field),
         _ => None,
