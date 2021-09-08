@@ -17,7 +17,6 @@ include = [
     "src/**/*",
     "examples/**/*",
     "benches/**/*",
-    "tests/**/*",
     "Cargo.toml",
     "LICENSE",
     "README.md"
@@ -41,6 +40,7 @@ tinystr = { version = "0.4.10", features = ["alloc", "serde"], default-features 
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"], optional = true }
 smallvec = "1.6"
 displaydoc = { version = "0.2.3", default-features = false }
+zerovec = { path = "../../utils/zerovec", version = "0.3", features = ["yoke"] }
 
 [dev-dependencies]
 criterion = "0.3"
@@ -63,21 +63,3 @@ default = ["provider_serde"]
 bench = []
 provider_serde = ["serde", "litemap/serde"]
 provider_transform_internals = ["std"]
-
-[[bench]]
-name = "datetime"
-harness = false
-required-features = ["provider_serde"]
-
-[[bench]]
-name = "pattern"
-harness = false
-required-features = ["bench"]
-
-[[test]]
-name = "datetime"
-required-features = ["provider_serde"]
-
-[[example]]
-name = "work_log"
-required-features = ["provider_serde"]
