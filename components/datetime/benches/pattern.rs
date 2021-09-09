@@ -7,7 +7,7 @@ use icu_datetime::{
     fields::{Field, FieldLength, FieldSymbol, Month, Year},
     pattern::{Pattern, PatternItem, ZVPattern},
 };
-use postcard::{from_bytes, to_allocvec};
+use postcard::from_bytes;
 use zerovec::ZeroVec;
 
 fn pattern_benches(c: &mut Criterion) {
