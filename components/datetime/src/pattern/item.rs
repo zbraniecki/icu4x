@@ -12,13 +12,24 @@ pub enum PatternItem {
 }
 
 impl EncodedPatternItem {
+    pub fn item_type_from_u8(byte: u8) -> bool {
+        byte & 0b1000_0000 != 0
+    }
+
+    pub fn clear_type_in_u8(byte: u8) -> u8 {
+        byte ^ 0b1000_0000
+    }
+
     pub fn bytes_in_range(value: (&u8, &u8, &u8)) -> bool {
-        let first_bit = 0b1000_0000 & value.0 != 0;
-        match first_bit {
+        match Self::item_type_from_u8(*value.0) {
             false => fields::Field::bytes_in_range((value.0, value.1), value.2),
             true => {
-                let first_cleared = value.0 ^ 0b1000_0000;
-                let u = u32::from_le_bytes([*value.2, *value.1, first_cleared, 0x00]);
+                let u = u32::from_le_bytes([
+                    *value.2,
+                    *value.1,
+                    Self::clear_type_in_u8(*value.0),
+                    0x00,
+                ]);
                 char::try_from(u).is_ok()
             }
         }
@@ -42,10 +53,7 @@ impl ULE for EncodedPatternItem {
     }
 
     fn as_byte_slice(_slice: &[Self]) -> &[u8] {
-        panic!();
-        // let data = slice.as_ptr();
-        // let len = slice.len();
-        // unsafe { std::slice::from_raw_parts(data as *const u8, len) }
+        todo!();
     }
 }
 
@@ -61,7 +69,11 @@ impl AsULE for PatternItem {
             Self::Literal(ch) => {
                 let u = *ch as u32;
                 let bytes = u.to_be_bytes();
-                EncodedPatternItem([bytes[1] | 0b1000_0000, bytes[2], bytes[3]])
+                EncodedPatternItem([
+                    EncodedPatternItem::clear_type_in_u8(bytes[1]),
+                    bytes[2],
+                    bytes[3],
+                ])
             }
         }
     }
@@ -69,8 +81,7 @@ impl AsULE for PatternItem {
     #[inline]
     fn from_unaligned(unaligned: &Self::ULE) -> Self {
         let value = unaligned.0;
-        let first_bit = 0b1000_0000 & value[0] != 0;
-        match first_bit {
+        match EncodedPatternItem::item_type_from_u8(value[0]) {
             false => {
                 let symbol = fields::FieldSymbol::from(value[1]);
                 let length = fields::FieldLength::from(value[2]);
