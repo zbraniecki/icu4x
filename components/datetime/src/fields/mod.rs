@@ -6,7 +6,7 @@ pub use symbol::*;
 
 use zerovec::ule::{AsULE, ULE};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Field {
     pub symbol: FieldSymbol,
     pub length: FieldLength,
@@ -14,6 +14,7 @@ pub struct Field {
 
 impl Field {
     pub fn bytes_in_range(symbol: (&u8, &u8), length: &u8) -> bool {
+        println!("{:#?}", symbol);
         FieldSymbol::kv_in_range(symbol.0, symbol.1) && FieldLength::u8_in_range(length)
     }
 }
