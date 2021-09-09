@@ -1,4 +1,3 @@
-use std::convert::{TryFrom, TryInto};
 use zerovec::ule::{AsULE, ULE};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -17,6 +16,10 @@ impl From<u8> for FieldLength {
         match input {
             1 => Self::One,
             2 => Self::TwoDigit,
+            3 => Self::Abbreviated,
+            4 => Self::Wide,
+            5 => Self::Narrow,
+            6 => Self::Six,
             _ => panic!(),
         }
     }
