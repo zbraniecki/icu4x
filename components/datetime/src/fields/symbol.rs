@@ -1,6 +1,6 @@
 use zerovec::ule::{AsULE, ULE};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
 pub enum FieldSymbol {
     Year(Year),
@@ -53,7 +53,7 @@ impl AsULE for FieldSymbol {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
 pub enum Year {
     Calendar,
@@ -99,7 +99,7 @@ impl AsULE for Year {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
 pub enum Month {
     Short,

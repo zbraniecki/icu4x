@@ -1,7 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 use zerovec::ule::{AsULE, ULE};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
 pub enum FieldLength {
     One = 1,
