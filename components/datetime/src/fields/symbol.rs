@@ -7,6 +7,30 @@ pub enum FieldSymbol {
     Month(Month),
 }
 
+impl From<u8> for FieldSymbol {
+    fn from(input: u8) -> Self {
+        let lower = input & 0b0000_1111;
+        let upper = input >> 4;
+
+        match lower {
+            0 => Self::Year(Year::from(upper)),
+            1 => Self::Month(Month::from(upper)),
+            _ => panic!(),
+        }
+    }
+}
+
+impl From<FieldSymbol> for u8 {
+    fn from(input: FieldSymbol) -> Self {
+        let (lower, upper) = match input {
+            FieldSymbol::Year(year) => (0b0000, year as u8),
+            FieldSymbol::Month(month) => (0b0001, month as u8),
+        };
+        let result = upper << 4;
+        result | lower
+    }
+}
+
 impl FieldSymbol {
     pub fn kv_in_range(k: &u8, v: &u8) -> bool {
         match k {
@@ -66,6 +90,16 @@ impl Year {
     }
 }
 
+impl From<u8> for Year {
+    fn from(input: u8) -> Self {
+        match input {
+            0 => Self::Calendar,
+            1 => Self::WeekOf,
+            _ => panic!(),
+        }
+    }
+}
+
 impl ULE for Year {
     type Error = ();
 
@@ -109,6 +143,16 @@ pub enum Month {
 impl Month {
     pub fn u8_in_range(v: &u8) -> bool {
         (0..2).contains(v)
+    }
+}
+
+impl From<u8> for Month {
+    fn from(input: u8) -> Self {
+        match input {
+            0 => Self::Short,
+            1 => Self::Long,
+            _ => panic!(),
+        }
     }
 }
 

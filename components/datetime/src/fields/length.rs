@@ -12,6 +12,16 @@ pub enum FieldLength {
     Six = 6,
 }
 
+impl From<u8> for FieldLength {
+    fn from(input: u8) -> Self {
+        match input {
+            1 => Self::One,
+            2 => Self::TwoDigit,
+            _ => panic!(),
+        }
+    }
+}
+
 impl FieldLength {
     pub fn u8_in_range(v: &u8) -> bool {
         (1..=6).contains(v)
