@@ -14,7 +14,6 @@ pub struct Field {
 
 impl Field {
     pub fn bytes_in_range(symbol: (&u8, &u8), length: &u8) -> bool {
-        println!("{:#?}", symbol);
         FieldSymbol::kv_in_range(symbol.0, symbol.1) && FieldLength::u8_in_range(length)
     }
 }
