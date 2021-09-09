@@ -1,6 +1,10 @@
 use zerovec::ule::{AsULE, ULE};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[cfg_attr(
+    feature = "provider_serde",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[repr(u8)]
 pub enum FieldLength {
     One = 1,

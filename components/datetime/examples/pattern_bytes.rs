@@ -2,15 +2,13 @@
 // called LICENSE at the top level of the ICU4X source tree
 // (online at: https://github.com/unicode-org/icu4x/blob/main/LICENSE ).
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use icu_datetime::{
     fields::{Field, FieldLength, FieldSymbol, Month, Year},
-    pattern::{Pattern, PatternItem, ZVPattern},
+    pattern::{Pattern, PatternItem},
 };
 use postcard::{from_bytes, to_allocvec};
-use zerovec::ZeroVec;
 
-fn pattern_benches(c: &mut Criterion) {
+fn main() {
     let data = (
         // Postcard
         &[
@@ -51,24 +49,13 @@ fn pattern_benches(c: &mut Criterion) {
             PatternItem::Literal('a'),
         ],
     );
-    let mut group = c.benchmark_group("load");
-    group.bench_function("from_items", |b| {
-        b.iter(|| {
-            let _ = Pattern(black_box(data).2.to_vec());
-        })
-    });
-    group.bench_function("from_postcard", |b| {
-        b.iter(|| {
-            let _: Pattern = from_bytes(black_box(data).0).unwrap();
-        })
-    });
-    group.bench_function("from_zerovec", |b| {
-        b.iter(|| {
-            let _ = ZVPattern(ZeroVec::try_from_bytes(black_box(data).1).unwrap());
-        })
-    });
-    group.finish();
+    let pattern = Pattern(data.2.to_vec());
+    println!("{:#?}", pattern);
+    let bytes: Vec<u8> = to_allocvec(&pattern).unwrap();
+    for b in &bytes {
+        println!("{:#010b}", b);
+    }
+    let result: Pattern = from_bytes(&bytes).unwrap();
+    assert_eq!(pattern, result);
+    assert_eq!(bytes, data.0);
 }
-
-criterion_group!(benches, pattern_benches,);
-criterion_main!(benches);

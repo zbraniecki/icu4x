@@ -41,6 +41,7 @@ serde = { version = "1.0", default-features = false, features = ["derive", "allo
 smallvec = "1.6"
 displaydoc = { version = "0.2.3", default-features = false }
 zerovec = { path = "../../utils/zerovec", version = "0.3", features = ["yoke"] }
+postcard = { version = "0.7", features = ["alloc"] }
 
 [dev-dependencies]
 criterion = "0.3"
@@ -63,3 +64,11 @@ default = ["provider_serde"]
 bench = []
 provider_serde = ["serde", "litemap/serde"]
 provider_transform_internals = ["std"]
+
+[[example]]
+name = "pattern_bytes"
+test = true
+
+[[bench]]
+name = "pattern"
+harness = false

@@ -6,6 +6,10 @@ use zerovec::ule::{AsULE, ULE};
 pub struct EncodedPatternItem(pub [u8; 3]);
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[cfg_attr(
+    feature = "provider_serde",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum PatternItem {
     Field(fields::Field),
     Literal(char),
