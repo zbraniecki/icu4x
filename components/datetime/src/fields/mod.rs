@@ -7,6 +7,10 @@ pub use symbol::*;
 use zerovec::ule::{AsULE, ULE};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[cfg_attr(
+    feature = "provider_serde",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct Field {
     pub symbol: FieldSymbol,
     pub length: FieldLength,

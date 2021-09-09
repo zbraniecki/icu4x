@@ -7,6 +7,10 @@ use zerovec::ZeroVec;
 pub struct ZVPattern<'data>(pub ZeroVec<'data, PatternItem>);
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(
+    feature = "provider_serde",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct Pattern(pub Vec<PatternItem>);
 
 impl From<ZVPattern<'_>> for Pattern {

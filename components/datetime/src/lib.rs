@@ -1,5 +1,5 @@
-mod fields;
-mod pattern;
+pub mod fields;
+pub mod pattern;
 
 #[cfg(test)]
 mod test {
@@ -106,9 +106,9 @@ mod test {
     fn test_pattern_items() {
         let data = (
             &[
-                0x00,
-                0x00,
-                0x01,
+                0b0000_0000,
+                0b0000_0000,
+                0b0000_0001,
                 0b0000_0001,
                 0b0000_0001,
                 0b0000_0010,
