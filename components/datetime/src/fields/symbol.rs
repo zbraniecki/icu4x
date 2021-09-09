@@ -58,7 +58,7 @@ impl ULE for FieldSymbol {
 
     fn as_byte_slice(slice: &[Self]) -> &[u8] {
         let data = slice.as_ptr();
-        let len = slice.len();
+        let len = slice.len() * 2;
         unsafe { std::slice::from_raw_parts(data as *const u8, len) }
     }
 }

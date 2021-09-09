@@ -30,6 +30,7 @@ mod test {
         for i in 0..zv.len() {
             assert_eq!(zv.get(i), Some(data.1[i]));
         }
+        assert_eq!(zv.as_bytes(), data.0);
     }
 
     #[test]
@@ -48,6 +49,7 @@ mod test {
         for i in 0..zv.len() {
             assert_eq!(zv.get(i), Some(data.1[i]));
         }
+        assert_eq!(zv.as_bytes(), data.0);
     }
 
     #[test]
@@ -69,6 +71,7 @@ mod test {
         for i in 0..zv.len() {
             assert_eq!(zv.get(i), Some(data.1[i]));
         }
+        assert_eq!(zv.as_bytes(), data.0);
     }
 
     #[test]
@@ -96,6 +99,7 @@ mod test {
         for i in 0..zv.len() {
             assert_eq!(zv.get(i), Some(data.1[i]));
         }
+        assert_eq!(zv.as_bytes(), data.0);
     }
 
     #[test]
@@ -126,7 +130,7 @@ mod test {
         );
         let encoded_items = pattern::EncodedPatternItem::parse_byte_slice(data.0).unwrap();
         let items = encoded_items
-            .into_iter()
+            .iter()
             .map(|i| pattern::PatternItem::from_unaligned(i))
             .collect::<Vec<_>>();
         assert_eq!(items.len(), data.1.len());
@@ -138,6 +142,7 @@ mod test {
         for i in 0..zv.len() {
             assert_eq!(zv.get(i), Some(data.1[i]));
         }
+        assert_eq!(zv.as_bytes(), data.0);
     }
 
     #[test]
@@ -163,10 +168,10 @@ mod test {
     fn test_pattern_from_bytes() {
         let data = (
             &[
-                0x00,
-                0x00,
-                0x01,
+                0b0000_0000,
+                0b0000_0000,
                 0b0000_0001,
+                0b0000_0000,
                 0b0000_0001,
                 0b0000_0010,
                 0b1000_0000,
@@ -191,11 +196,13 @@ mod test {
         for i in 0..pattern.0.len() {
             assert_eq!(zv_pattern.0.get(i).as_ref(), pattern.0.get(i));
         }
+        assert_eq!(zv_pattern.0.as_bytes(), data.0);
 
         let zv_pattern: ZVPattern = (&pattern).into();
         assert_eq!(zv_pattern.0.len(), data.1.len());
         for i in 0..pattern.0.len() {
             assert_eq!(zv_pattern.0.get(i).as_ref(), pattern.0.get(i));
         }
+        assert_eq!(zv_pattern.0.as_bytes(), data.0);
     }
 }

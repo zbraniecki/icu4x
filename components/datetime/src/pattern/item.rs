@@ -20,6 +20,10 @@ impl EncodedPatternItem {
         byte ^ 0b1000_0000
     }
 
+    pub fn set_literal_in_u8(byte: u8) -> u8 {
+        byte | 0b1000_0000
+    }
+
     pub fn bytes_in_range(value: (&u8, &u8, &u8)) -> bool {
         match Self::item_type_from_u8(*value.0) {
             false => fields::Field::bytes_in_range((value.0, value.1), value.2),
@@ -52,8 +56,10 @@ impl ULE for EncodedPatternItem {
         Ok(unsafe { std::slice::from_raw_parts(data as *const Self, len) })
     }
 
-    fn as_byte_slice(_slice: &[Self]) -> &[u8] {
-        todo!();
+    fn as_byte_slice(slice: &[Self]) -> &[u8] {
+        let data = slice.as_ptr();
+        let len = slice.len() * 3;
+        unsafe { std::slice::from_raw_parts(data as *const u8, len) }
     }
 }
 
@@ -70,7 +76,7 @@ impl AsULE for PatternItem {
                 let u = *ch as u32;
                 let bytes = u.to_be_bytes();
                 EncodedPatternItem([
-                    EncodedPatternItem::clear_type_in_u8(bytes[1]),
+                    EncodedPatternItem::set_literal_in_u8(bytes[1]),
                     bytes[2],
                     bytes[3],
                 ])
