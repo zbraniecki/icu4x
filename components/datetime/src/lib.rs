@@ -1,11 +1,14 @@
 mod fields;
 mod pattern;
-use zerovec::ule::{AsULE, ULE};
-use zerovec::ZeroVec;
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use pattern::{Pattern, PatternItem, ZVPattern};
+    use zerovec::{
+        ule::{AsULE, ULE},
+        ZeroVec,
+    };
 
     #[test]
     fn test_lengths() {
@@ -153,6 +156,46 @@ mod test {
 
             let bytes = u8::from(fs);
             assert_eq!(data.0[i], bytes);
+        }
+    }
+
+    #[test]
+    fn test_pattern_from_bytes() {
+        let data = (
+            &[
+                0x00,
+                0x00,
+                0x01,
+                0b0000_0001,
+                0b0000_0001,
+                0b0000_0010,
+                0b1000_0000,
+                0b0000_0000,
+                0b0110_0001,
+            ],
+            &[
+                PatternItem::Field(fields::Field {
+                    symbol: fields::FieldSymbol::Year(fields::Year::Calendar),
+                    length: fields::FieldLength::One,
+                }),
+                PatternItem::Field(fields::Field {
+                    symbol: fields::FieldSymbol::Month(fields::Month::Short),
+                    length: fields::FieldLength::TwoDigit,
+                }),
+                PatternItem::Literal('a'),
+            ],
+        );
+        let pattern = Pattern(data.1.to_vec());
+        let zv_pattern = ZVPattern(ZeroVec::try_from_bytes(data.0).unwrap());
+        assert_eq!(zv_pattern.0.len(), data.1.len());
+        for i in 0..pattern.0.len() {
+            assert_eq!(zv_pattern.0.get(i).as_ref(), pattern.0.get(i));
+        }
+
+        let zv_pattern: ZVPattern = (&pattern).into();
+        assert_eq!(zv_pattern.0.len(), data.1.len());
+        for i in 0..pattern.0.len() {
+            assert_eq!(zv_pattern.0.get(i).as_ref(), pattern.0.get(i));
         }
     }
 }
