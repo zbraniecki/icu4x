@@ -72,17 +72,19 @@ impl From<FieldSymbol> for u8 {
 }
 
 impl FieldSymbol {
-    pub fn kv_in_range(k: &u8, v: &u8) -> bool {
+    pub fn kv_in_range(kv: &u8) -> bool {
+        let k = kv & 0b0000_1111;
+        let v = kv >> 4;
         match k {
-            0 => Year::u8_in_range(v),
-            1 => Month::u8_in_range(v),
-            2 => Day::u8_in_range(v),
-            3 => Weekday::u8_in_range(v),
-            4 => DayPeriod::u8_in_range(v),
-            5 => Hour::u8_in_range(v),
+            0 => Year::u8_in_range(&v),
+            1 => Month::u8_in_range(&v),
+            2 => Day::u8_in_range(&v),
+            3 => Weekday::u8_in_range(&v),
+            4 => DayPeriod::u8_in_range(&v),
+            5 => Hour::u8_in_range(&v),
             6 => true,
-            7 => Second::u8_in_range(v),
-            8 => TimeZone::u8_in_range(v),
+            7 => Second::u8_in_range(&v),
+            8 => TimeZone::u8_in_range(&v),
             _ => false,
         }
     }
@@ -111,20 +113,17 @@ impl ULE for FieldSymbol {
     type Error = ();
 
     fn parse_byte_slice(bytes: &[u8]) -> Result<&[Self], Self::Error> {
-        let mut chunks = bytes.chunks_exact(2);
-
-        if !chunks.all(|c| FieldSymbol::kv_in_range(&c[0], &c[1])) || !chunks.remainder().is_empty()
-        {
+        if !bytes.iter().all(|c| FieldSymbol::kv_in_range(c)) {
             return Err(());
         }
         let data = bytes.as_ptr();
-        let len = bytes.len() / 2;
+        let len = bytes.len();
         Ok(unsafe { std::slice::from_raw_parts(data as *const Self, len) })
     }
 
     fn as_byte_slice(slice: &[Self]) -> &[u8] {
         let data = slice.as_ptr();
-        let len = slice.len() * 2;
+        let len = slice.len();
         unsafe { std::slice::from_raw_parts(data as *const u8, len) }
     }
 }

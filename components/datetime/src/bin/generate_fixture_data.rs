@@ -4,15 +4,49 @@
 
 use icu_datetime::{
     fields::{Field, FieldLength, FieldSymbol, Month, Year},
-    fixtures::get_patterns_fixture,
-    pattern::{Pattern, PatternItem},
+    fixtures::{get_pattern_string_list, PatternList, PatternStringList, ZVPatternList},
+    pattern::{Pattern, PatternItem, ZVPattern},
 };
 use postcard::{from_bytes, to_allocvec};
+use std::fs::File;
+use std::io::prelude::*;
 
 fn main() {
-    let data = get_patterns_fixture().unwrap();
-    for s in &data.0 {
-        let pattern = Pattern::from_bytes(s).unwrap();
-        println!("{:?}", pattern);
+    let pattern_string_list = get_pattern_string_list().unwrap();
+
+    let mut file = File::create("./data/pattern_strings.postcard").unwrap();
+    let bytes: Vec<u8> = to_allocvec(&pattern_string_list).unwrap();
+    file.write_all(&bytes).unwrap();
+
+    {
+        let result: PatternStringList = from_bytes(&bytes).unwrap();
+        assert_eq!(pattern_string_list, result);
+    }
+
+    let patterns = PatternList::from(pattern_string_list);
+    serde_json::to_writer(
+        &File::create("./data/pattern_structs.json").unwrap(),
+        &patterns,
+    )
+    .unwrap();
+    let bytes: Vec<u8> = to_allocvec(&patterns).unwrap();
+    let mut file = File::create("./data/pattern_structs.postcard").unwrap();
+    file.write_all(&bytes).unwrap();
+
+    {
+        let result: PatternList = from_bytes(&bytes).unwrap();
+        assert_eq!(patterns, result);
+    }
+
+    let zv_pattern_list = ZVPatternList::from(&patterns);
+    let bytes: Vec<u8> = to_allocvec(&zv_pattern_list).unwrap();
+    let mut file = File::create("./data/pattern_zv.postcard").unwrap();
+    file.write_all(&bytes).unwrap();
+
+    {
+        let result: ZVPatternList = from_bytes(&bytes).unwrap();
+        assert_eq!(zv_pattern_list, result);
+        let result2 = PatternList::from(result);
+        assert_eq!(patterns, result2);
     }
 }
