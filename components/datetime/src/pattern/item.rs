@@ -18,7 +18,7 @@ pub enum PatternItem {
 }
 
 impl EncodedPatternItem {
-    pub fn item_type_from_u8(byte: u8) -> bool {
+    pub fn is_literal_from_u8(byte: u8) -> bool {
         byte & 0b1000_0000 != 0
     }
 
@@ -31,8 +31,8 @@ impl EncodedPatternItem {
     }
 
     pub fn bytes_in_range(value: (&u8, &u8, &u8)) -> bool {
-        match Self::item_type_from_u8(*value.0) {
-            false => fields::Field::bytes_in_range((value.0, value.1), value.2),
+        match Self::is_literal_from_u8(*value.0) {
+            false => fields::Field::bytes_in_range(value.1, value.2),
             true => {
                 let u = u32::from_le_bytes([
                     *value.2,
@@ -47,7 +47,7 @@ impl EncodedPatternItem {
 }
 
 impl ULE for EncodedPatternItem {
-    type Error = ();
+    type Error = &'static str;
 
     fn parse_byte_slice(bytes: &[u8]) -> Result<&[Self], Self::Error> {
         let mut chunks = bytes.chunks_exact(3);
@@ -55,7 +55,7 @@ impl ULE for EncodedPatternItem {
         if !chunks.all(|c| Self::bytes_in_range((&c[0], &c[1], &c[2])))
             || !chunks.remainder().is_empty()
         {
-            return Err(());
+            return Err("invalid bytes for EncodedPatternItem");
         }
         let data = bytes.as_ptr();
         let len = bytes.len() / 3;
@@ -93,7 +93,7 @@ impl AsULE for PatternItem {
     #[inline]
     fn from_unaligned(unaligned: &Self::ULE) -> Self {
         let value = unaligned.0;
-        match EncodedPatternItem::item_type_from_u8(value[0]) {
+        match EncodedPatternItem::is_literal_from_u8(value[0]) {
             false => {
                 let symbol = fields::FieldSymbol::try_from(value[1]).unwrap();
                 let length = fields::FieldLength::try_from(value[2]).unwrap();

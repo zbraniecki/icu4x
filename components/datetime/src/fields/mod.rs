@@ -27,8 +27,8 @@ pub struct Field {
 }
 
 impl Field {
-    pub fn bytes_in_range(symbol: (&u8, &u8), length: &u8) -> bool {
-        FieldSymbol::kv_in_range(symbol.0, symbol.1) && FieldLength::u8_in_range(length)
+    pub fn bytes_in_range(symbol: &u8, length: &u8) -> bool {
+        FieldSymbol::kv_in_range(symbol) && FieldLength::u8_in_range(length)
     }
 }
 
@@ -36,21 +36,19 @@ impl ULE for Field {
     type Error = ();
 
     fn parse_byte_slice(bytes: &[u8]) -> Result<&[Self], Self::Error> {
-        let mut chunks = bytes.chunks_exact(3);
+        let mut chunks = bytes.chunks_exact(2);
 
-        if !chunks.all(|c| Self::bytes_in_range((&c[0], &c[1]), &c[2]))
-            || !chunks.remainder().is_empty()
-        {
+        if !chunks.all(|c| Self::bytes_in_range(&c[0], &c[1])) || !chunks.remainder().is_empty() {
             return Err(());
         }
         let data = bytes.as_ptr();
-        let len = bytes.len() / 3;
+        let len = bytes.len() / 2;
         Ok(unsafe { std::slice::from_raw_parts(data as *const Self, len) })
     }
 
     fn as_byte_slice(slice: &[Self]) -> &[u8] {
         let data = slice.as_ptr();
-        let len = slice.len() * 3;
+        let len = slice.len() * 2;
         unsafe { std::slice::from_raw_parts(data as *const u8, len) }
     }
 }
