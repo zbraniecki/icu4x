@@ -1,4 +1,13 @@
+use std::convert::TryFrom;
 use zerovec::ule::{AsULE, ULE};
+
+use displaydoc::Display;
+
+#[derive(Display, Debug, PartialEq)]
+pub enum LengthError {
+    #[displaydoc("Invalid length")]
+    InvalidLength,
+}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(
@@ -13,20 +22,6 @@ pub enum FieldLength {
     Wide = 4,
     Narrow = 5,
     Six = 6,
-}
-
-impl From<u8> for FieldLength {
-    fn from(input: u8) -> Self {
-        match input {
-            1 => Self::One,
-            2 => Self::TwoDigit,
-            3 => Self::Abbreviated,
-            4 => Self::Wide,
-            5 => Self::Narrow,
-            6 => Self::Six,
-            _ => panic!(),
-        }
-    }
 }
 
 impl FieldLength {
@@ -67,3 +62,26 @@ impl AsULE for FieldLength {
         *unaligned
     }
 }
+
+macro_rules! try_field_length {
+    ($i:ty) => {
+        impl TryFrom<$i> for FieldLength {
+            type Error = LengthError;
+
+            fn try_from(input: $i) -> Result<Self, Self::Error> {
+                Ok(match input {
+                    1 => Self::One,
+                    2 => Self::TwoDigit,
+                    3 => Self::Abbreviated,
+                    4 => Self::Wide,
+                    5 => Self::Narrow,
+                    6 => Self::Six,
+                    _ => return Err(LengthError::InvalidLength),
+                })
+            }
+        }
+    };
+}
+
+try_field_length!(u8);
+try_field_length!(usize);

@@ -4,7 +4,17 @@ mod symbol;
 pub use length::*;
 pub use symbol::*;
 
+use displaydoc::Display;
+use std::convert::{TryFrom, TryInto};
 use zerovec::ule::{AsULE, ULE};
+
+#[derive(Display, Debug)]
+pub enum Error {
+    #[displaydoc("Field {0:?} is not a valid length")]
+    InvalidLength(FieldSymbol),
+}
+
+impl std::error::Error for Error {}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(
@@ -56,5 +66,28 @@ impl AsULE for Field {
     #[inline]
     fn from_unaligned(unaligned: &Self::ULE) -> Self {
         *unaligned
+    }
+}
+
+impl From<(FieldSymbol, FieldLength)> for Field {
+    fn from(input: (FieldSymbol, FieldLength)) -> Self {
+        Self {
+            symbol: input.0,
+            length: input.1,
+        }
+    }
+}
+
+impl TryFrom<(FieldSymbol, u8)> for Field {
+    type Error = Error;
+    fn try_from(input: (FieldSymbol, u8)) -> Result<Self, Self::Error> {
+        let (symbol, length) = (
+            input.0,
+            input
+                .1
+                .try_into()
+                .map_err(|_| Self::Error::InvalidLength(input.0))?,
+        );
+        Ok(Self { symbol, length })
     }
 }
