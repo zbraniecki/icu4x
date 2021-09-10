@@ -1,4 +1,6 @@
+use super::error::Error;
 use crate::fields;
+use crate::fields::{Field, FieldLength, FieldSymbol};
 use std::convert::TryFrom;
 use zerovec::ule::{AsULE, ULE};
 
@@ -93,8 +95,8 @@ impl AsULE for PatternItem {
         let value = unaligned.0;
         match EncodedPatternItem::item_type_from_u8(value[0]) {
             false => {
-                let symbol = fields::FieldSymbol::from(value[1]);
-                let length = fields::FieldLength::from(value[2]);
+                let symbol = fields::FieldSymbol::try_from(value[1]).unwrap();
+                let length = fields::FieldLength::try_from(value[2]).unwrap();
                 let field = fields::Field { symbol, length };
                 PatternItem::Field(field)
             }
@@ -104,5 +106,23 @@ impl AsULE for PatternItem {
                 PatternItem::Literal(char::try_from(u).unwrap())
             }
         }
+    }
+}
+
+impl TryFrom<(FieldSymbol, u8)> for PatternItem {
+    type Error = Error;
+    fn try_from(input: (FieldSymbol, u8)) -> Result<Self, Self::Error> {
+        let length =
+            FieldLength::try_from(input.1).map_err(|_| Error::FieldLengthInvalid(input.0))?;
+        Ok(Self::Field(Field {
+            symbol: input.0,
+            length,
+        }))
+    }
+}
+
+impl From<char> for PatternItem {
+    fn from(input: char) -> Self {
+        Self::Literal(input)
     }
 }

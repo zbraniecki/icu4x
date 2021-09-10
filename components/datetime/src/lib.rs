@@ -1,4 +1,6 @@
 pub mod fields;
+#[cfg(feature = "provider_serde")]
+pub mod fixtures;
 pub mod pattern;
 
 #[cfg(test)]

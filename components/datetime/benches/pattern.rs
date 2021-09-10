@@ -51,7 +51,7 @@ fn pattern_benches(c: &mut Criterion) {
             PatternItem::Literal('a'),
         ],
     );
-    let mut group = c.benchmark_group("load");
+    let mut group = c.benchmark_group("criterion/load");
     group.bench_function("from_items", |b| {
         b.iter(|| {
             let _ = Pattern(black_box(data).2.to_vec());
