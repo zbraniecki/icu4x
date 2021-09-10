@@ -11,13 +11,13 @@ use zerovec::ZeroVec;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PatternList(pub Vec<Pattern>);
 
-impl From<PatternStringList> for PatternList {
-    fn from(input: PatternStringList) -> Self {
+impl From<&PatternStringList> for PatternList {
+    fn from(input: &PatternStringList) -> Self {
         Self(
             input
                 .0
-                .into_iter()
-                .map(|s| Pattern::from_bytes(&s).unwrap())
+                .iter()
+                .map(|s| Pattern::from_bytes(s).unwrap())
                 .collect(),
         )
     }
@@ -62,6 +62,13 @@ pub struct PatternStringList(pub Vec<String>);
 #[allow(dead_code)]
 pub fn get_pattern_string_list() -> std::io::Result<PatternStringList> {
     let file = File::open("./data/pattern_strings.json")?;
+    let reader = BufReader::new(file);
+    Ok(serde_json::from_reader(reader)?)
+}
+
+#[allow(dead_code)]
+pub fn get_pattern_list() -> std::io::Result<PatternList> {
+    let file = File::open("./data/pattern_structs.json")?;
     let reader = BufReader::new(file);
     Ok(serde_json::from_reader(reader)?)
 }

@@ -3,143 +3,42 @@
 // (online at: https://github.com/unicode-org/icu4x/blob/main/LICENSE ).
 
 use iai::black_box;
-use icu_datetime::{
-    fields::{Field, FieldLength, FieldSymbol, Month, Year},
-    pattern::{Pattern, PatternItem, ZVPattern},
-};
+use icu_datetime::fixtures::{PatternList, PatternStringList, ZVPatternList};
 use postcard::from_bytes;
-use zerovec::ZeroVec;
+use std::fs;
 
-fn iai_pattern_items() {
-    let data = (
-        // Postcard
-        &[
-            0b0000_0011,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0001,
-            0b0000_0001,
-            0b0110_0001,
-        ],
-        // ZeroVec
-        &[
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0010,
-            0b1000_0000,
-            0b0000_0000,
-            0b0110_0001,
-        ],
-        &[
-            PatternItem::Field(Field {
-                symbol: FieldSymbol::Year(Year::Calendar),
-                length: FieldLength::One,
-            }),
-            PatternItem::Field(Field {
-                symbol: FieldSymbol::Month(Month::Short),
-                length: FieldLength::TwoDigit,
-            }),
-            PatternItem::Literal('a'),
-        ],
-    );
-    let _ = Pattern(black_box(data).2.to_vec());
+fn iai_pattern_strings_json() {
+    let pattern_string_list_json = fs::read("./data/pattern_strings.json").unwrap();
+    let json: PatternStringList = serde_json::from_slice(&pattern_string_list_json).unwrap();
+    let _ = PatternList::from(black_box(&json));
 }
 
-fn iai_pattern_postcard() {
-    let data = (
-        // Postcard
-        &[
-            0b0000_0011,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0001,
-            0b0000_0001,
-            0b0110_0001,
-        ],
-        // ZeroVec
-        &[
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0010,
-            0b1000_0000,
-            0b0000_0000,
-            0b0110_0001,
-        ],
-        &[
-            PatternItem::Field(Field {
-                symbol: FieldSymbol::Year(Year::Calendar),
-                length: FieldLength::One,
-            }),
-            PatternItem::Field(Field {
-                symbol: FieldSymbol::Month(Month::Short),
-                length: FieldLength::TwoDigit,
-            }),
-            PatternItem::Literal('a'),
-        ],
-    );
-    let _: Pattern = from_bytes(black_box(data).0).unwrap();
+fn iai_pattern_structs_json() {
+    let pattern_list_json = fs::read("./data/pattern_structs.json").unwrap();
+    let _: PatternList = serde_json::from_slice(&pattern_list_json).unwrap();
+}
+
+fn iai_pattern_strings_postcard() {
+    let pattern_strings_postcard = fs::read("./data/pattern_strings.postcard").unwrap();
+    let result: PatternStringList = from_bytes(&pattern_strings_postcard).unwrap();
+    let _ = PatternList::from(black_box(&result));
+}
+
+fn iai_pattern_structs_postcard() {
+    let pattern_structs_postcard = fs::read("./data/pattern_structs.postcard").unwrap();
+    let _: PatternList = from_bytes(&pattern_structs_postcard).unwrap();
 }
 
 fn iai_pattern_zv() {
-    let data = (
-        // Postcard
-        &[
-            0b0000_0011,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0001,
-            0b0000_0001,
-            0b0110_0001,
-        ],
-        // ZeroVec
-        &[
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0010,
-            0b1000_0000,
-            0b0000_0000,
-            0b0110_0001,
-        ],
-        &[
-            PatternItem::Field(Field {
-                symbol: FieldSymbol::Year(Year::Calendar),
-                length: FieldLength::One,
-            }),
-            PatternItem::Field(Field {
-                symbol: FieldSymbol::Month(Month::Short),
-                length: FieldLength::TwoDigit,
-            }),
-            PatternItem::Literal('a'),
-        ],
-    );
-    let _ = ZVPattern(ZeroVec::try_from_bytes(black_box(data).1).unwrap());
+    let pattern_zv_postcard = fs::read("./data/pattern_zv.postcard").unwrap();
+    let result: ZVPatternList = from_bytes(&pattern_zv_postcard).unwrap();
+    let _ = PatternList::from(result);
 }
 
-iai::main!(iai_pattern_items, iai_pattern_postcard, iai_pattern_zv);
+iai::main!(
+    iai_pattern_strings_json,
+    iai_pattern_structs_json,
+    iai_pattern_strings_postcard,
+    iai_pattern_structs_postcard,
+    iai_pattern_zv
+);

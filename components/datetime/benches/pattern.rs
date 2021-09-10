@@ -3,68 +3,45 @@
 // (online at: https://github.com/unicode-org/icu4x/blob/main/LICENSE ).
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use icu_datetime::{
-    fields::{Field, FieldLength, FieldSymbol, Month, Year},
-    pattern::{Pattern, PatternItem, ZVPattern},
-};
+use icu_datetime::fixtures::{PatternList, PatternStringList, ZVPatternList};
 use postcard::from_bytes;
-use zerovec::ZeroVec;
+use std::fs;
 
 fn pattern_benches(c: &mut Criterion) {
-    let data = (
-        // Postcard
-        &[
-            0b0000_0011,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0001,
-            0b0000_0001,
-            0b0110_0001,
-        ],
-        // ZeroVec
-        &[
-            0b0000_0000,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0000,
-            0b0000_0001,
-            0b0000_0010,
-            0b1000_0000,
-            0b0000_0000,
-            0b0110_0001,
-        ],
-        &[
-            PatternItem::Field(Field {
-                symbol: FieldSymbol::Year(Year::Calendar),
-                length: FieldLength::One,
-            }),
-            PatternItem::Field(Field {
-                symbol: FieldSymbol::Month(Month::Short),
-                length: FieldLength::TwoDigit,
-            }),
-            PatternItem::Literal('a'),
-        ],
-    );
+    let pattern_string_list_json = fs::read("./data/pattern_strings.json").unwrap();
+    let pattern_list_json = fs::read("./data/pattern_structs.json").unwrap();
+    let pattern_strings_postcard = fs::read("./data/pattern_strings.postcard").unwrap();
+    let pattern_structs_postcard = fs::read("./data/pattern_structs.postcard").unwrap();
+    let pattern_zv_postcard = fs::read("./data/pattern_zv.postcard").unwrap();
+
     let mut group = c.benchmark_group("criterion/load");
-    group.bench_function("from_items", |b| {
+    group.bench_function("from_strings_json", |b| {
         b.iter(|| {
-            let _ = Pattern(black_box(data).2.to_vec());
+            let json: PatternStringList =
+                serde_json::from_slice(&pattern_string_list_json).unwrap();
+            let _ = PatternList::from(black_box(&json));
         })
     });
-    group.bench_function("from_postcard", |b| {
+    group.bench_function("from_structs_json", |b| {
         b.iter(|| {
-            let _: Pattern = from_bytes(black_box(data).0).unwrap();
+            let _: PatternList = serde_json::from_slice(&pattern_list_json).unwrap();
         })
     });
-    group.bench_function("from_zerovec", |b| {
+    group.bench_function("from_strings_postcard", |b| {
         b.iter(|| {
-            let _ = ZVPattern(ZeroVec::try_from_bytes(black_box(data).1).unwrap());
+            let result: PatternStringList = from_bytes(&pattern_strings_postcard).unwrap();
+            let _ = PatternList::from(black_box(&result));
+        })
+    });
+    group.bench_function("from_structs_postcard", |b| {
+        b.iter(|| {
+            let _: PatternList = from_bytes(&pattern_structs_postcard).unwrap();
+        })
+    });
+    group.bench_function("from_zerovec_postcard", |b| {
+        b.iter(|| {
+            let result: ZVPatternList = from_bytes(&pattern_zv_postcard).unwrap();
+            let _ = PatternList::from(result);
         })
     });
     group.finish();
