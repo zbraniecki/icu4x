@@ -2,10 +2,8 @@
 // called LICENSE at the top level of the ICU4X source tree
 // (online at: https://github.com/unicode-org/icu4x/blob/main/LICENSE ).
 
-use icu_datetime::{
-    fields::{Field, FieldLength, FieldSymbol, Month, Year},
-    fixtures::{get_pattern_string_list, PatternList, PatternStringList, ZVPatternList},
-    pattern::{Pattern, PatternItem, ZVPattern},
+use icu_datetime::fixtures::{
+    get_pattern_string_list, PatternList, PatternStringList, ZVPatternList,
 };
 use postcard::{from_bytes, to_allocvec};
 use std::fs::File;
@@ -23,7 +21,7 @@ fn main() {
         assert_eq!(pattern_string_list, result);
     }
 
-    let patterns = PatternList::from(pattern_string_list);
+    let patterns = PatternList::from(&pattern_string_list);
     serde_json::to_writer(
         &File::create("./data/pattern_structs.json").unwrap(),
         &patterns,

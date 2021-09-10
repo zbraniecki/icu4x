@@ -1,5 +1,5 @@
 use displaydoc::Display;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use zerovec::ule::{AsULE, ULE};
 
 #[derive(Display, Debug, PartialEq)]
