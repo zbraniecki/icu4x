@@ -8,7 +8,7 @@ use parser::Parser;
 use zerovec::ZeroVec;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ZVPattern<'data>(pub ZeroVec<'data, PatternItem>);
+pub struct ZVPattern(pub ZeroVec<'static, PatternItem>);
 
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(
@@ -16,11 +16,11 @@ pub struct ZVPattern<'data>(pub ZeroVec<'data, PatternItem>);
     derive(serde::Serialize, serde::Deserialize)
 )]
 pub struct Pattern {
-    items: Vec<PatternItem>,
+    pub items: Vec<PatternItem>,
 }
 
-impl From<ZVPattern<'_>> for Pattern {
-    fn from(input: ZVPattern<'_>) -> Self {
+impl From<ZVPattern> for Pattern {
+    fn from(input: ZVPattern) -> Self {
         Self {
             items: input.0.to_vec(),
         }
@@ -28,8 +28,8 @@ impl From<ZVPattern<'_>> for Pattern {
 }
 
 impl Pattern {
-    pub fn items(&self) -> &[PatternItem] {
-        &self.items
+    pub fn items(&self) -> std::slice::Iter<PatternItem> {
+        self.items.iter()
     }
 
     pub fn from_bytes(input: &str) -> Result<Self, Error> {
@@ -50,7 +50,7 @@ impl From<Vec<PatternItem>> for Pattern {
     }
 }
 
-impl From<&Pattern> for ZVPattern<'_> {
+impl From<&Pattern> for ZVPattern {
     fn from(input: &Pattern) -> Self {
         Self(ZeroVec::clone_from_slice(&input.items))
     }

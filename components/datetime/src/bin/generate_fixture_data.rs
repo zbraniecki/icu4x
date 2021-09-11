@@ -8,6 +8,7 @@ use icu_datetime::fixtures::{
 use postcard::{from_bytes, to_allocvec};
 use std::fs::File;
 use std::io::prelude::*;
+use zerovec::VarZeroVec;
 
 fn main() {
     let pattern_string_list = get_pattern_string_list().unwrap();
@@ -36,15 +37,14 @@ fn main() {
         assert_eq!(patterns, result);
     }
 
-    let zv_pattern_list = ZVPatternList::from(&patterns);
-    let bytes: Vec<u8> = to_allocvec(&zv_pattern_list).unwrap();
-    let mut file = File::create("./data/pattern_zv.postcard").unwrap();
+    let zv_patterns: ZVPatternList<'_> = (&patterns).into();
+    let bytes = VarZeroVec::get_serializable_bytes(&zv_patterns.0.to_vec()).unwrap();
+    let mut file = File::create("./data/pattern_structs.zv").unwrap();
     file.write_all(&bytes).unwrap();
 
     {
-        let result: ZVPatternList = from_bytes(&bytes).unwrap();
-        assert_eq!(zv_pattern_list, result);
-        let result2 = PatternList::from(result);
-        assert_eq!(patterns, result2);
+        let zvpl: ZVPatternList<'_> = ZVPatternList(VarZeroVec::try_from_bytes(&bytes).unwrap());
+        let result = zvpl.into();
+        assert_eq!(patterns, result);
     }
 }

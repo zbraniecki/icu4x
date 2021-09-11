@@ -2,11 +2,11 @@
 // called LICENSE at the top level of the ICU4X source tree
 // (online at: https://github.com/unicode-org/icu4x/blob/main/LICENSE ).
 
-use crate::pattern::{Pattern, ZVPattern};
+use crate::pattern::{Pattern, PatternItem, ZVPattern};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::BufReader;
-use zerovec::ZeroVec;
+use zerovec::{ule::AsULE, VarZeroVec, ZeroVec};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PatternList(pub Vec<Pattern>);
@@ -23,33 +23,27 @@ impl From<&PatternStringList> for PatternList {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ZVPatternList(pub Vec<Vec<u8>>);
+#[derive(Clone, Debug, PartialEq)]
+pub struct ZVPatternList<'data>(pub VarZeroVec<'data, ZeroVec<'static, PatternItem>>);
 
-impl From<&PatternList> for ZVPatternList {
-    fn from(input: &PatternList) -> Self {
-        Self(
-            input
-                .0
-                .iter()
-                .map(|p| {
-                    let zv_pattern: ZVPattern = p.into();
-                    zv_pattern.0.as_bytes().to_vec()
-                })
-                .collect(),
-        )
+impl<'data> From<&PatternList> for ZVPatternList<'_> {
+    fn from(patterns: &PatternList) -> Self {
+        let zv_patterns: Vec<ZeroVec<'static, PatternItem>> =
+            patterns.0.iter().map(|p| ZVPattern::from(p).0).collect();
+        Self(zv_patterns.into())
     }
 }
 
-impl From<ZVPatternList> for PatternList {
-    fn from(input: ZVPatternList) -> Self {
+impl From<ZVPatternList<'_>> for PatternList {
+    fn from(vzv: ZVPatternList<'_>) -> Self {
         Self(
-            input
-                .0
-                .into_iter()
-                .map(|bytes| {
-                    let zv_pattern = ZVPattern(ZeroVec::try_from_bytes(&bytes).unwrap());
-                    zv_pattern.into()
+            vzv.0
+                .iter()
+                .map(|zv| Pattern {
+                    items: zv
+                        .iter()
+                        .map(|epi| PatternItem::from_unaligned(epi))
+                        .collect(),
                 })
                 .collect(),
         )

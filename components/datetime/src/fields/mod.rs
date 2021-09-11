@@ -32,7 +32,7 @@ impl Field {
     }
 }
 
-impl ULE for Field {
+unsafe impl ULE for Field {
     type Error = ();
 
     fn parse_byte_slice(bytes: &[u8]) -> Result<&[Self], Self::Error> {
@@ -44,6 +44,12 @@ impl ULE for Field {
         let data = bytes.as_ptr();
         let len = bytes.len() / 2;
         Ok(unsafe { std::slice::from_raw_parts(data as *const Self, len) })
+    }
+
+    unsafe fn from_byte_slice_unchecked(bytes: &[u8]) -> &[Self] {
+        let data = bytes.as_ptr();
+        let len = bytes.len() / 2;
+        std::slice::from_raw_parts(data as *const Self, len)
     }
 
     fn as_byte_slice(slice: &[Self]) -> &[u8] {

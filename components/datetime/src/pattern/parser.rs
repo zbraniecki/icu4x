@@ -161,7 +161,7 @@ impl<'p> Parser<'p> {
                     let replacement = replacements
                         .get_mut(idx as usize)
                         .ok_or(Error::UnknownSubstitution(ch))?;
-                    result.extend_from_slice(replacement.items());
+                    result.extend(replacement.items());
                     let ch = chars.next().ok_or(Error::UnclosedPlaceholder)?;
                     if ch != '}' {
                         return Err(Error::UnclosedPlaceholder);

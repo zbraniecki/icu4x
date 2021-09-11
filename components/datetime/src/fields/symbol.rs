@@ -109,7 +109,7 @@ impl TryFrom<char> for FieldSymbol {
     }
 }
 
-impl ULE for FieldSymbol {
+unsafe impl ULE for FieldSymbol {
     type Error = ();
 
     fn parse_byte_slice(bytes: &[u8]) -> Result<&[Self], Self::Error> {
@@ -119,6 +119,12 @@ impl ULE for FieldSymbol {
         let data = bytes.as_ptr();
         let len = bytes.len();
         Ok(unsafe { std::slice::from_raw_parts(data as *const Self, len) })
+    }
+
+    unsafe fn from_byte_slice_unchecked(bytes: &[u8]) -> &[Self] {
+        let data = bytes.as_ptr();
+        let len = bytes.len();
+        std::slice::from_raw_parts(data as *const Self, len)
     }
 
     fn as_byte_slice(slice: &[Self]) -> &[u8] {
@@ -199,7 +205,7 @@ macro_rules! field_type {
             }
         }
 
-        impl ULE for $i {
+        unsafe impl ULE for $i {
             type Error = ();
 
             fn parse_byte_slice(bytes: &[u8]) -> Result<&[Self], Self::Error> {
@@ -209,6 +215,12 @@ macro_rules! field_type {
                 let data = bytes.as_ptr();
                 let len = bytes.len();
                 Ok(unsafe { std::slice::from_raw_parts(data as *const Self, len) })
+            }
+
+            unsafe fn from_byte_slice_unchecked(bytes: &[u8]) -> &[Self] {
+                let data = bytes.as_ptr();
+                let len = bytes.len();
+                std::slice::from_raw_parts(data as *const Self, len)
             }
 
             fn as_byte_slice(slice: &[Self]) -> &[u8] {

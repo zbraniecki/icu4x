@@ -6,6 +6,7 @@ use iai::black_box;
 use icu_datetime::fixtures::{PatternList, PatternStringList, ZVPatternList};
 use postcard::from_bytes;
 use std::fs;
+use zerovec::VarZeroVec;
 
 fn iai_pattern_strings_json() {
     let pattern_string_list_json = fs::read("./data/pattern_strings.json").unwrap();
@@ -29,10 +30,11 @@ fn iai_pattern_structs_postcard() {
     let _: PatternList = from_bytes(&pattern_structs_postcard).unwrap();
 }
 
-fn iai_pattern_zv() {
-    let pattern_zv_postcard = fs::read("./data/pattern_zv.postcard").unwrap();
-    let result: ZVPatternList = from_bytes(&pattern_zv_postcard).unwrap();
-    let _ = PatternList::from(result);
+fn iai_pattern_structs_zv() {
+    let pattern_structs_zv = fs::read("./data/pattern_structs.zv").unwrap();
+    let zvpl: ZVPatternList<'_> =
+        ZVPatternList(VarZeroVec::try_from_bytes(&pattern_structs_zv).unwrap());
+    let _: PatternList = zvpl.into();
 }
 
 iai::main!(
@@ -40,5 +42,5 @@ iai::main!(
     iai_pattern_structs_json,
     iai_pattern_strings_postcard,
     iai_pattern_structs_postcard,
-    iai_pattern_zv
+    iai_pattern_structs_zv
 );
