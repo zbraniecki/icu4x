@@ -2,14 +2,14 @@
 // called LICENSE at the top level of the ICU4X source tree
 // (online at: https://github.com/unicode-org/icu4x/blob/main/LICENSE ).
 
-use crate::pattern::{Pattern, PatternItem, ZVPattern};
+use crate::pattern::{PatternItem, VecPattern, ZVPattern};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::BufReader;
 use zerovec::{ule::AsULE, VarZeroVec, ZeroVec};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct PatternList(pub Vec<Pattern>);
+pub struct PatternList(pub Vec<VecPattern>);
 
 impl From<&PatternStringList> for PatternList {
     fn from(input: &PatternStringList) -> Self {
@@ -17,7 +17,7 @@ impl From<&PatternStringList> for PatternList {
             input
                 .0
                 .iter()
-                .map(|s| Pattern::from_bytes(s).unwrap())
+                .map(|s| VecPattern::from_bytes(s).unwrap())
                 .collect(),
         )
     }
@@ -28,8 +28,11 @@ pub struct ZVPatternList<'data>(pub VarZeroVec<'data, ZeroVec<'static, PatternIt
 
 impl<'data> From<&PatternList> for ZVPatternList<'_> {
     fn from(patterns: &PatternList) -> Self {
-        let zv_patterns: Vec<ZeroVec<'static, PatternItem>> =
-            patterns.0.iter().map(|p| ZVPattern::from(p).0).collect();
+        let zv_patterns: Vec<ZeroVec<'static, PatternItem>> = patterns
+            .0
+            .iter()
+            .map(|p| ZVPattern::from(p).items)
+            .collect();
         Self(zv_patterns.into())
     }
 }
@@ -39,7 +42,7 @@ impl From<ZVPatternList<'_>> for PatternList {
         Self(
             vzv.0
                 .iter()
-                .map(|zv| Pattern {
+                .map(|zv| VecPattern {
                     items: zv
                         .iter()
                         .map(|epi| PatternItem::from_unaligned(epi))

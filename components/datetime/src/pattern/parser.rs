@@ -5,6 +5,7 @@
 use super::error::Error;
 use super::{Pattern, PatternItem};
 use crate::fields::FieldSymbol;
+use crate::pattern::PatternItemsVecType;
 use core::convert::{TryFrom, TryInto};
 use std::string::String;
 use std::vec;
@@ -146,7 +147,7 @@ impl<'p> Parser<'p> {
 
     pub fn parse_placeholders(
         mut self,
-        mut replacements: Vec<Pattern>,
+        replacements: Vec<Pattern<Vec<PatternItem>>>,
     ) -> Result<Vec<PatternItem>, Error> {
         let mut chars = self.source.chars().peekable();
         let mut result = vec![];
@@ -159,9 +160,9 @@ impl<'p> Parser<'p> {
                     let ch = chars.next().ok_or(Error::UnclosedPlaceholder)?;
                     let idx: u32 = ch.to_digit(10).ok_or(Error::UnknownSubstitution(ch))?;
                     let replacement = replacements
-                        .get_mut(idx as usize)
+                        .get(idx as usize)
                         .ok_or(Error::UnknownSubstitution(ch))?;
-                    result.extend(replacement.items());
+                    result.extend(replacement.get_items());
                     let ch = chars.next().ok_or(Error::UnclosedPlaceholder)?;
                     if ch != '}' {
                         return Err(Error::UnclosedPlaceholder);
