@@ -18,6 +18,7 @@ use crate::{
     fields::{self, Field, FieldLength, FieldSymbol},
     options::{components, length, preferences},
     pattern::{Pattern, PatternItem},
+    provider::gregory::patterns::LengthGenericPatternsV1,
     provider::gregory::patterns::{LengthPatternsV1, PatternV1, SkeletonV1, SkeletonsV1},
 };
 
@@ -179,7 +180,7 @@ impl TryFrom<&str> for Skeleton {
     fn try_from(skeleton_string: &str) -> Result<Self, Self::Error> {
         let mut fields: SmallVec<[fields::Field; 5]> = SmallVec::new();
 
-        let mut iter = skeleton_string.bytes().peekable();
+        let mut iter = skeleton_string.chars().peekable();
         while let Some(byte) = iter.next() {
             // Convert the byte to a valid field symbol.
             let field_symbol = FieldSymbol::try_from(byte)?;
@@ -215,10 +216,10 @@ impl TryFrom<&str> for Skeleton {
 /// be exposed as a public API for end users.
 #[doc(hidden)]
 #[cfg(feature = "provider_transform_internals")]
-impl From<&Pattern> for Skeleton {
-    fn from(pattern: &Pattern) -> Self {
+impl From<&Vec<PatternItem>> for Skeleton {
+    fn from(pattern: &Vec<PatternItem>) -> Self {
         let mut fields: SmallVec<[fields::Field; 5]> = SmallVec::new();
-        for item in pattern.items() {
+        for item in pattern.iter() {
             if let crate::pattern::PatternItem::Field(field) = item {
                 let mut field = *field;
 
@@ -271,10 +272,10 @@ impl From<&Pattern> for Skeleton {
 pub struct AvailableFormatPattern<'a> {
     /// The skeleton that is used to match against.
     skeleton: &'a Skeleton,
-    pub pattern: &'a Pattern,
+    pub pattern: &'a zerovec::ZeroVec<'a, PatternItem>,
 }
 
-impl<'a> From<(&'a SkeletonV1, &'a PatternV1)> for AvailableFormatPattern<'a> {
+impl<'a> From<(&'a SkeletonV1, &'a PatternV1<'a>)> for AvailableFormatPattern<'a> {
     fn from(tuple: (&'a SkeletonV1, &'a PatternV1)) -> Self {
         let (skeleton_v1, pattern_v1) = tuple;
 
@@ -432,13 +433,13 @@ fn naively_apply_hour_cycle_preferences(
         hour_cycle: Some(hour_cycle),
     }) = preferences
     {
-        for item in pattern.items_mut() {
-            if let PatternItem::Field(fields::Field { symbol, length: _ }) = item {
-                if let fields::FieldSymbol::Hour(_) = symbol {
-                    *symbol = fields::FieldSymbol::Hour(hour_cycle.field());
-                }
-            }
-        }
+        // for item in pattern.items_mut() {
+        //     if let PatternItem::Field(fields::Field { symbol, length: _ }) = item {
+        //         if let fields::FieldSymbol::Hour(_) = symbol {
+        //             *symbol = fields::FieldSymbol::Hour(hour_cycle.field());
+        //         }
+        //     }
+        // }
     }
 }
 
@@ -450,15 +451,15 @@ fn naively_apply_time_zone_name(
 ) {
     // If there is a preference overiding the hour cycle, apply it now.
     if let Some(time_zone_name) = time_zone_name {
-        for item in pattern.items_mut() {
-            if let PatternItem::Field(fields::Field {
-                symbol: fields::FieldSymbol::TimeZone(_),
-                length: _,
-            }) = item
-            {
-                *item = PatternItem::Field((*time_zone_name).into());
-            }
-        }
+        // for item in pattern.items_mut() {
+        //     if let PatternItem::Field(fields::Field {
+        //         symbol: fields::FieldSymbol::TimeZone(_),
+        //         length: _,
+        //     }) = item
+        //     {
+        //         *item = PatternItem::Field((*time_zone_name).into());
+        //     }
+        // }
     }
 }
 
@@ -478,12 +479,12 @@ fn naively_apply_time_zone_name(
 ///         configuration option makes it so that the final pattern won't have additional work
 ///         done to mutate it to match the fields. It will prefer the actual matched pattern.
 pub fn create_best_pattern_for_fields<'a>(
-    skeletons: &'a SkeletonsV1,
-    length_patterns: &LengthPatternsV1,
+    skeletons: &SkeletonsV1<'a>,
+    length_patterns: &LengthGenericPatternsV1,
     fields: &[Field],
     components: &components::Bag,
     prefer_matched_pattern: bool,
-) -> BestSkeleton<Pattern> {
+) -> BestSkeleton<Pattern<'a>> {
     let first_pattern_match =
         get_best_available_format_pattern(skeletons, fields, prefer_matched_pattern);
 
@@ -573,10 +574,10 @@ pub fn create_best_pattern_for_fields<'a>(
                 length::Date::Short => &length_patterns.short,
             };
 
-            Some(
-                Pattern::from_bytes_combination(bytes, date_pattern, time_pattern)
-                    .expect("Failed to create a Pattern from bytes"),
-            )
+            let gp = crate::pattern::generic::GenericPattern {
+                items: bytes.0.clone(),
+            };
+            Some(gp.combined(date_pattern, time_pattern).unwrap())
         }
         (None, Some(pattern)) => Some(pattern),
         (Some(pattern), None) => Some(pattern),
@@ -648,11 +649,11 @@ fn group_fields_by_type(fields: &[Field]) -> FieldsByType {
 ///  * 2.6.2.2 Missing Skeleton Fields
 ///    - TODO(#586) - Using the CLDR appendItems field. Note: There is not agreement yet on how
 ///      much of this step to implement. See the issue for more information.
-pub fn get_best_available_format_pattern(
-    skeletons: &SkeletonsV1,
+pub fn get_best_available_format_pattern<'data>(
+    skeletons: &SkeletonsV1<'data>,
     fields: &[Field],
     prefer_matched_pattern: bool,
-) -> BestSkeleton<Pattern> {
+) -> BestSkeleton<Pattern<'data>> {
     let mut closest_format_pattern = None;
     let mut closest_distance: u32 = u32::MAX;
     let mut closest_missing_fields = 0;
@@ -744,7 +745,7 @@ pub fn get_best_available_format_pattern(
     }
 
     if closest_distance == NO_DISTANCE {
-        return BestSkeleton::AllFieldsMatch(closest_format_pattern.clone());
+        return BestSkeleton::AllFieldsMatch(Pattern::from(closest_format_pattern.to_vec()));
     }
 
     // Modify the resulting pattern to have fields of the same length.
@@ -753,11 +754,10 @@ pub fn get_best_available_format_pattern(
         panic!("This code branch should only be run when transforming provider code.");
 
         #[cfg(feature = "provider_transform_internals")]
-        closest_format_pattern.clone()
+        Pattern::from(closest_format_pattern.to_vec())
     } else {
         Pattern::from(
             closest_format_pattern
-                .items()
                 .iter()
                 .map(|item| {
                     if let PatternItem::Field(pattern_field) = item {
@@ -789,7 +789,7 @@ pub fn get_best_available_format_pattern(
 
 pub fn get_available_format_patterns<'a>(
     skeletons: &'a SkeletonsV1,
-) -> impl Iterator<Item = AvailableFormatPattern> + 'a {
+) -> impl Iterator<Item = AvailableFormatPattern<'a>> + 'a {
     skeletons.0.iter().map(AvailableFormatPattern::from)
 }
 

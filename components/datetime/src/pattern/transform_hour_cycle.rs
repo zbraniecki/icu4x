@@ -12,11 +12,15 @@ use crate::fields;
 use crate::pattern::{CoarseHourCycle, Pattern, PatternItem};
 use crate::provider;
 use crate::skeleton;
+use zerovec::{
+    ule::{AsULE, ULE},
+    ZeroVec,
+};
 
 /// Figure out the coarse hour cycle given a pattern, which is useful for generating the provider
 /// patterns for `length::Bag`.
 pub fn determine_coarse_hour_cycle(pattern: &Pattern) -> Option<CoarseHourCycle> {
-    for item in pattern.items() {
+    for item in pattern.items.iter() {
         if let PatternItem::Field(fields::Field {
             symbol: fields::FieldSymbol::Hour(pattern_hour),
             length: _,
@@ -39,11 +43,23 @@ pub fn determine_coarse_hour_cycle(pattern: &Pattern) -> Option<CoarseHourCycle>
 pub fn apply_coarse_hour_cycle(
     datetime: &provider::gregory::patterns::DateTimeFormatsV1,
     pattern_str: &str,
-    mut pattern: Pattern,
+    pattern: Pattern,
     coarse_hour_cycle: CoarseHourCycle,
 ) -> Option<String> {
-    for item in pattern.items_mut() {
-        if let PatternItem::Field(fields::Field { symbol, length: _ }) = item {
+    let mut pattern: Vec<PatternItem> =
+        if let zerovec::ZeroVec::Owned(v) = pattern.items.into_owned() {
+            v.into_iter()
+                .map(|i| PatternItem::from_unaligned(&i))
+                .collect()
+        } else {
+            panic!();
+        };
+    for item in pattern.iter_mut() {
+        if let PatternItem::Field(fields::Field {
+            ref mut symbol,
+            length: _,
+        }) = item
+        {
             if let fields::FieldSymbol::Hour(pattern_hour) = symbol {
                 if match coarse_hour_cycle {
                     CoarseHourCycle::H11H12 => match pattern_hour {

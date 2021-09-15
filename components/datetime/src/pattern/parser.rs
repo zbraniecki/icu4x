@@ -3,6 +3,7 @@
 // (online at: https://github.com/unicode-org/icu4x/blob/main/LICENSE ).
 
 use super::error::Error;
+use super::generic::{GenericPattern, GenericPatternItem};
 use super::{Pattern, PatternItem};
 use crate::fields::FieldSymbol;
 use alloc::string::String;
@@ -81,6 +82,41 @@ impl<'p> Parser<'p> {
         }
     }
 
+    fn handle_generic_quoted_literal(
+        &mut self,
+        ch: char,
+        chars: &mut core::iter::Peekable<core::str::Chars>,
+        result: &mut Vec<GenericPatternItem>,
+    ) -> Result<bool, Error> {
+        if ch == '\'' {
+            match (&mut self.state, chars.peek() == Some(&'\'')) {
+                (
+                    Segment::Literal {
+                        ref mut literal, ..
+                    },
+                    true,
+                ) => {
+                    literal.push('\'');
+                    chars.next();
+                }
+                (Segment::Literal { ref mut quoted, .. }, false) => {
+                    *quoted = !*quoted;
+                }
+                _ => panic!(),
+            }
+            Ok(true)
+        } else if let Segment::Literal {
+            ref mut literal,
+            quoted: true,
+        } = self.state
+        {
+            literal.push(ch);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     fn collect_segment(state: Segment, result: &mut Vec<PatternItem>) -> Result<(), Error> {
         match state {
             Segment::Symbol { symbol, length } => {
@@ -91,9 +127,31 @@ impl<'p> Parser<'p> {
             }
             Segment::Literal { literal, .. } => {
                 if !literal.is_empty() {
-                    result.push(literal.into());
+                    for ch in literal.chars() {
+                        result.push(ch.into());
+                    }
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn collect_generic_segment(
+        state: Segment,
+        result: &mut Vec<GenericPatternItem>,
+    ) -> Result<(), Error> {
+        match state {
+            Segment::Literal { quoted, .. } if quoted => {
+                return Err(Error::UnclosedLiteral);
+            }
+            Segment::Literal { literal, .. } => {
+                if !literal.is_empty() {
+                    for ch in literal.chars() {
+                        result.push(ch.into());
+                    }
+                }
+            }
+            _ => panic!(),
         }
         Ok(())
     }
@@ -142,24 +200,18 @@ impl<'p> Parser<'p> {
         Ok(result)
     }
 
-    pub fn parse_placeholders(
-        mut self,
-        mut replacements: Vec<Pattern>,
-    ) -> Result<Vec<PatternItem>, Error> {
+    pub fn parse_generic(mut self) -> Result<Vec<GenericPatternItem>, Error> {
         let mut chars = self.source.chars().peekable();
         let mut result = vec![];
 
         while let Some(ch) = chars.next() {
-            if !self.handle_quoted_literal(ch, &mut chars, &mut result)? {
+            if !self.handle_generic_quoted_literal(ch, &mut chars, &mut result)? {
                 if ch == '{' {
-                    Self::collect_segment(self.state, &mut result)?;
+                    Self::collect_generic_segment(self.state, &mut result)?;
 
                     let ch = chars.next().ok_or(Error::UnclosedPlaceholder)?;
                     let idx: u32 = ch.to_digit(10).ok_or(Error::UnknownSubstitution(ch))?;
-                    let replacement = replacements
-                        .get_mut(idx as usize)
-                        .ok_or(Error::UnknownSubstitution(ch))?;
-                    result.extend_from_slice(replacement.items());
+                    result.push(GenericPatternItem::Placeholder(idx as u8));
                     let ch = chars.next().ok_or(Error::UnclosedPlaceholder)?;
                     if ch != '}' {
                         return Err(Error::UnclosedPlaceholder);
@@ -179,7 +231,7 @@ impl<'p> Parser<'p> {
             }
         }
 
-        Self::collect_segment(self.state, &mut result)?;
+        Self::collect_generic_segment(self.state, &mut result)?;
 
         Ok(result)
     }

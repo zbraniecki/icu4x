@@ -8,6 +8,7 @@ pub(crate) mod symbols;
 use displaydoc::Display;
 pub use length::{FieldLength, LengthError};
 pub use symbols::*;
+use zerovec::ule::{AsULE, ULE};
 
 use core::{
     cmp::{Ord, PartialOrd},
@@ -47,6 +48,10 @@ impl Field {
             FieldSymbol::TimeZone(zone) => zone.get_length_type(self.length),
         }
     }
+
+    pub fn bytes_in_range(symbol: &u8, length: &u8) -> bool {
+        FieldSymbol::kv_in_range(symbol) && FieldLength::u8_in_range(length)
+    }
 }
 
 impl From<(FieldSymbol, FieldLength)> for Field {
@@ -69,5 +74,46 @@ impl TryFrom<(FieldSymbol, usize)> for Field {
                 .map_err(|_| Self::Error::InvalidLength(input.0))?,
         );
         Ok(Self { symbol, length })
+    }
+}
+
+unsafe impl ULE for Field {
+    type Error = ();
+
+    fn parse_byte_slice(bytes: &[u8]) -> Result<&[Self], Self::Error> {
+        let mut chunks = bytes.chunks_exact(2);
+
+        if !chunks.all(|c| Self::bytes_in_range(&c[0], &c[1])) || !chunks.remainder().is_empty() {
+            return Err(());
+        }
+        let data = bytes.as_ptr();
+        let len = bytes.len() / 2;
+        Ok(unsafe { core::slice::from_raw_parts(data as *const Self, len) })
+    }
+
+    unsafe fn from_byte_slice_unchecked(bytes: &[u8]) -> &[Self] {
+        let data = bytes.as_ptr();
+        let len = bytes.len() / 2;
+        core::slice::from_raw_parts(data as *const Self, len)
+    }
+
+    fn as_byte_slice(slice: &[Self]) -> &[u8] {
+        let data = slice.as_ptr();
+        let len = slice.len() * 2;
+        unsafe { core::slice::from_raw_parts(data as *const u8, len) }
+    }
+}
+
+impl AsULE for Field {
+    type ULE = Self;
+
+    #[inline]
+    fn as_unaligned(&self) -> Self::ULE {
+        *self
+    }
+
+    #[inline]
+    fn from_unaligned(unaligned: &Self::ULE) -> Self {
+        *unaligned
     }
 }

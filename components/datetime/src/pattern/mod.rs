@@ -3,6 +3,7 @@
 // (online at: https://github.com/unicode-org/icu4x/blob/main/LICENSE ).
 
 mod error;
+pub mod generic;
 mod parser;
 pub mod transform_hour_cycle;
 
@@ -18,6 +19,8 @@ use core::{convert::TryFrom, fmt};
 use core::{fmt::Write, iter::FromIterator};
 pub use error::Error;
 use parser::Parser;
+use zerovec::ule::{AsULE, ULE};
+use zerovec::ZeroVec;
 
 #[cfg(feature = "provider_serde")]
 use serde::{
@@ -26,14 +29,115 @@ use serde::{
     Deserialize, Deserializer, Serialize,
 };
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(
     feature = "provider_serde",
     derive(serde::Serialize, serde::Deserialize)
 )]
+pub struct EncodedPatternItem(pub [u8; 3]);
+
+impl EncodedPatternItem {
+    pub fn is_literal_from_u8(byte: u8) -> bool {
+        byte & 0b1000_0000 != 0
+    }
+
+    pub fn clear_type_in_u8(byte: u8) -> u8 {
+        byte ^ 0b1000_0000
+    }
+
+    pub fn set_literal_in_u8(byte: u8) -> u8 {
+        byte | 0b1000_0000
+    }
+
+    pub fn bytes_in_range(value: (&u8, &u8, &u8)) -> bool {
+        match Self::is_literal_from_u8(*value.0) {
+            false => fields::Field::bytes_in_range(value.1, value.2),
+            true => {
+                let u = u32::from_le_bytes([
+                    *value.2,
+                    *value.1,
+                    Self::clear_type_in_u8(*value.0),
+                    0x00,
+                ]);
+                char::try_from(u).is_ok()
+            }
+        }
+    }
+}
+
+unsafe impl ULE for EncodedPatternItem {
+    type Error = &'static str;
+
+    fn parse_byte_slice(bytes: &[u8]) -> Result<&[Self], Self::Error> {
+        let mut chunks = bytes.chunks_exact(3);
+
+        if !chunks.all(|c| Self::bytes_in_range((&c[0], &c[1], &c[2])))
+            || !chunks.remainder().is_empty()
+        {
+            return Err("invalid bytes for EncodedPatternItem");
+        }
+        let data = bytes.as_ptr();
+        let len = bytes.len() / 3;
+        Ok(unsafe { core::slice::from_raw_parts(data as *const Self, len) })
+    }
+
+    unsafe fn from_byte_slice_unchecked(bytes: &[u8]) -> &[Self] {
+        let data = bytes.as_ptr();
+        let len = bytes.len() / 3;
+        core::slice::from_raw_parts(data as *const Self, len)
+    }
+
+    fn as_byte_slice(slice: &[Self]) -> &[u8] {
+        let data = slice.as_ptr();
+        let len = slice.len() * 3;
+        unsafe { core::slice::from_raw_parts(data as *const u8, len) }
+    }
+}
+
+impl AsULE for PatternItem {
+    type ULE = EncodedPatternItem;
+
+    #[inline]
+    fn as_unaligned(&self) -> Self::ULE {
+        match self {
+            Self::Field(field) => {
+                EncodedPatternItem([0x00, u8::from(field.symbol), field.length as u8])
+            }
+            Self::Literal(ch) => {
+                let u = *ch as u32;
+                let bytes = u.to_be_bytes();
+                EncodedPatternItem([
+                    EncodedPatternItem::set_literal_in_u8(bytes[1]),
+                    bytes[2],
+                    bytes[3],
+                ])
+            }
+        }
+    }
+
+    #[inline]
+    fn from_unaligned(unaligned: &Self::ULE) -> Self {
+        let value = unaligned.0;
+        match EncodedPatternItem::is_literal_from_u8(value[0]) {
+            false => {
+                let symbol = fields::FieldSymbol::try_from(value[1]).unwrap();
+                let length = fields::FieldLength::try_from(value[2]).unwrap();
+                let field = fields::Field { symbol, length };
+                PatternItem::Field(field)
+            }
+            true => {
+                let first_cleared = value[0] ^ 0b1000_0000;
+                let u = u32::from_be_bytes([0x00, first_cleared, value[1], value[2]]);
+                PatternItem::Literal(char::try_from(u).unwrap())
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum PatternItem {
     Field(fields::Field),
-    Literal(String),
+    Literal(char),
 }
 
 impl From<(FieldSymbol, FieldLength)> for PatternItem {
@@ -57,14 +161,8 @@ impl TryFrom<(FieldSymbol, u8)> for PatternItem {
     }
 }
 
-impl<'p> From<&str> for PatternItem {
-    fn from(input: &str) -> Self {
-        Self::Literal(input.into())
-    }
-}
-
-impl<'p> From<String> for PatternItem {
-    fn from(input: String) -> Self {
+impl<'p> From<char> for PatternItem {
+    fn from(input: char) -> Self {
         Self::Literal(input)
     }
 }
@@ -82,9 +180,14 @@ pub(super) enum TimeGranularity {
     Seconds,
 }
 
-#[derive(Default, Debug, Clone, PartialEq)]
-pub struct Pattern {
-    items: Vec<PatternItem>,
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(
+    feature = "provider_serde",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+pub struct Pattern<'data> {
+    #[cfg_attr(feature = "provider_serde", serde(borrow))]
+    pub items: ZeroVec<'data, PatternItem>,
     time_granularity: Option<TimeGranularity>,
 }
 
@@ -102,24 +205,9 @@ fn get_time_granularity(item: &PatternItem) -> Option<TimeGranularity> {
     }
 }
 
-impl Pattern {
-    pub fn items(&self) -> &[PatternItem] {
-        &self.items
-    }
-
-    pub fn items_mut(&mut self) -> &mut [PatternItem] {
-        &mut self.items
-    }
-
+impl Pattern<'_> {
     pub fn from_bytes(input: &str) -> Result<Self, Error> {
         Parser::new(input).parse().map(Self::from)
-    }
-
-    // TODO(#277): This should be turned into a utility for all ICU4X.
-    pub fn from_bytes_combination(input: &str, date: Self, time: Self) -> Result<Self, Error> {
-        Parser::new(input)
-            .parse_placeholders(vec![time, date])
-            .map(Self::from)
     }
 
     pub(super) fn most_granular_time(&self) -> Option<TimeGranularity> {
@@ -127,13 +215,73 @@ impl Pattern {
     }
 }
 
-impl From<Vec<PatternItem>> for Pattern {
+impl From<Vec<PatternItem>> for Pattern<'_> {
     fn from(items: Vec<PatternItem>) -> Self {
         Self {
             time_granularity: items.iter().filter_map(get_time_granularity).max(),
+            items: ZeroVec::clone_from_slice(&items),
+        }
+    }
+}
+
+impl<'data> From<ZeroVec<'data, PatternItem>> for Pattern<'data> {
+    fn from(items: ZeroVec<'data, PatternItem>) -> Self {
+        Self {
+            time_granularity: items.iter().filter_map(|i| get_time_granularity(&i)).max(),
             items,
         }
     }
+}
+
+fn dump_buffer_into_formatter(literal: &str, formatter: &mut fmt::Formatter) -> fmt::Result {
+    if literal.is_empty() {
+        return Ok(());
+    }
+    // Determine if the literal contains any characters that would need to be escaped.
+    let mut needs_escaping = false;
+    for ch in literal.chars() {
+        if ch.is_ascii_alphabetic() || ch == '\'' {
+            needs_escaping = true;
+            break;
+        }
+    }
+
+    if needs_escaping {
+        let mut ch_iter = literal.trim_end().chars().peekable();
+
+        // Do not escape the leading whitespace.
+        while let Some(ch) = ch_iter.peek() {
+            if ch.is_whitespace() {
+                formatter.write_char(*ch)?;
+                ch_iter.next();
+            } else {
+                break;
+            }
+        }
+
+        // Wrap in "'" and escape "'".
+        formatter.write_char('\'')?;
+        for ch in ch_iter {
+            if ch == '\'' {
+                // Escape a single quote.
+                formatter.write_char('\\')?;
+            }
+            formatter.write_char(ch)?;
+        }
+        formatter.write_char('\'')?;
+
+        // Add the trailing whitespace
+        for ch in literal.chars().rev() {
+            if ch.is_whitespace() {
+                formatter.write_char(ch)?;
+            } else {
+                break;
+            }
+        }
+    } else {
+        formatter.write_str(literal)?;
+    }
+    Ok(())
 }
 
 /// This trait is implemented in order to provide the machinery to convert a [`Pattern`] to a UTS 35
@@ -141,158 +289,122 @@ impl From<Vec<PatternItem>> for Pattern {
 /// this was not done, as this code would need to implement the [`write_len()`] method, which would
 /// need to duplicate the branching logic of the [`fmt`](std::fmt) method here. This code is used in generating
 /// the data providers and is not as performance sensitive.
-impl fmt::Display for Pattern {
+impl fmt::Display for Pattern<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        for pattern_item in self.items().iter() {
+        let mut buffer = String::new();
+        for pattern_item in self.items.iter() {
             match pattern_item {
                 PatternItem::Field(field) => {
+                    dump_buffer_into_formatter(&buffer, formatter)?;
+                    buffer.clear();
                     let ch: char = field.symbol.into();
                     for _ in 0..field.length as usize {
                         formatter.write_char(ch)?;
                     }
                 }
-                PatternItem::Literal(literal) => {
-                    // Determine if the literal contains any characters that would need to be escaped.
-                    let mut needs_escaping = false;
-                    for ch in literal.chars() {
-                        if ch.is_ascii_alphabetic() || ch == '\'' {
-                            needs_escaping = true;
-                            break;
-                        }
-                    }
-
-                    if needs_escaping {
-                        let mut ch_iter = literal.trim_end().chars().peekable();
-
-                        // Do not escape the leading whitespace.
-                        while let Some(ch) = ch_iter.peek() {
-                            if ch.is_whitespace() {
-                                formatter.write_char(*ch)?;
-                                ch_iter.next();
-                            } else {
-                                break;
-                            }
-                        }
-
-                        // Wrap in "'" and escape "'".
-                        formatter.write_char('\'')?;
-                        for ch in ch_iter {
-                            if ch == '\'' {
-                                // Escape a single quote.
-                                formatter.write_char('\\')?;
-                            }
-                            formatter.write_char(ch)?;
-                        }
-                        formatter.write_char('\'')?;
-
-                        // Add the trailing whitespace
-                        for ch in literal.chars().rev() {
-                            if ch.is_whitespace() {
-                                formatter.write_char(ch)?;
-                            } else {
-                                break;
-                            }
-                        }
-                    } else {
-                        formatter.write_str(literal)?;
-                    }
+                PatternItem::Literal(ch) => {
+                    buffer.push(ch);
                 }
             }
         }
+        dump_buffer_into_formatter(&buffer, formatter)?;
+        buffer.clear();
         Ok(())
     }
 }
 
-impl FromIterator<PatternItem> for Pattern {
-    fn from_iter<I: IntoIterator<Item = PatternItem>>(iter: I) -> Self {
-        Self::from(iter.into_iter().collect::<Vec<_>>())
-    }
-}
+// impl FromIterator<PatternItem> for Pattern<'_> {
+//     fn from_iter<I: IntoIterator<Item = PatternItem>>(iter: I) -> Self {
+//         Self::from(iter.into_iter().collect::<Vec<_>>())
+//     }
+// }
 
-#[cfg(feature = "provider_serde")]
-#[allow(clippy::upper_case_acronyms)]
-struct DeserializePatternUTS35String;
+// #[cfg(feature = "provider_serde")]
+// #[allow(clippy::upper_case_acronyms)]
+// struct DeserializePatternUTS35String;
 
-#[cfg(feature = "provider_serde")]
-impl<'de> de::Visitor<'de> for DeserializePatternUTS35String {
-    type Value = Pattern;
+// #[cfg(feature = "provider_serde")]
+// impl<'de> de::Visitor<'de> for DeserializePatternUTS35String {
+//     type Value = Pattern<'static>;
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "Expected to find a valid pattern.")
-    }
+//     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+//         write!(formatter, "Expected to find a valid pattern.")
+//     }
 
-    fn visit_str<E>(self, pattern_string: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        // Parse a string into a list of fields.
-        Pattern::from_bytes(pattern_string).map_err(|err| {
-            de::Error::invalid_value(
-                de::Unexpected::Other(&format!("{}", err)),
-                &"a valid UTS 35 pattern string",
-            )
-        })
-    }
-}
+//     fn visit_str<E>(self, pattern_string: &str) -> Result<Self::Value, E>
+//     where
+//         E: de::Error,
+//     {
+//         // Parse a string into a list of fields.
+//         todo!()
+//         // Pattern::from_bytes(pattern_string).map_err(|err| {
+//         //     de::Error::invalid_value(
+//         //         de::Unexpected::Other(&format!("{}", err)),
+//         //         &"a valid UTS 35 pattern string",
+//         //     )
+//         // })
+//     }
+// }
 
-#[cfg(feature = "provider_serde")]
-struct DeserializePatternBincode;
+// #[cfg(feature = "provider_serde")]
+// struct DeserializePatternBincode;
 
-#[cfg(feature = "provider_serde")]
-impl<'de> de::Visitor<'de> for DeserializePatternBincode {
-    type Value = Pattern;
+// #[cfg(feature = "provider_serde")]
+// impl<'de> de::Visitor<'de> for DeserializePatternBincode {
+//     type Value = Pattern<'static>;
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "Unable to deserialize a bincode Pattern.")
-    }
+//     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+//         write!(formatter, "Unable to deserialize a bincode Pattern.")
+//     }
 
-    fn visit_seq<V>(self, mut seq: V) -> Result<Pattern, V::Error>
-    where
-        V: de::SeqAccess<'de>,
-    {
-        let mut items = Vec::new();
-        while let Some(item) = seq.next_element()? {
-            items.push(item)
-        }
-        Ok(Pattern::from(items))
-    }
-}
+//     fn visit_seq<V>(self, mut seq: V) -> Result<Pattern<'static>, V::Error>
+//     where
+//         V: de::SeqAccess<'de>,
+//     {
+//         todo!()
+//         // let mut items = Vec::new();
+//         // while let Some(item) = seq.next_element()? {
+//         //     items.push(item)
+//         // }
+//         // Ok(Pattern::from(items))
+//     }
+// }
 
-#[cfg(feature = "provider_serde")]
-impl<'de> Deserialize<'de> for Pattern {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        if deserializer.is_human_readable() {
-            deserializer.deserialize_str(DeserializePatternUTS35String)
-        } else {
-            deserializer.deserialize_seq(DeserializePatternBincode)
-        }
-    }
-}
+// #[cfg(feature = "provider_serde")]
+// impl<'de> Deserialize<'de> for Pattern<'_> {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: Deserializer<'de>,
+//     {
+//         if deserializer.is_human_readable() {
+//             deserializer.deserialize_str(DeserializePatternUTS35String)
+//         } else {
+//             deserializer.deserialize_seq(DeserializePatternBincode)
+//         }
+//     }
+// }
 
-#[cfg(feature = "provider_serde")]
-impl Serialize for Pattern {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: ser::Serializer,
-    {
-        if serializer.is_human_readable() {
-            // Serialize into the UTS 35 string representation.
-            let string: String = self.to_string();
-            serializer.serialize_str(&string)
-        } else {
-            // Serialize into a bincode-friendly representation. This means that pattern parsing
-            // will not be needed when deserializing.
-            let mut seq = serializer.serialize_seq(Some(self.items.len()))?;
-            for item in self.items.iter() {
-                seq.serialize_element(item)?;
-            }
-            seq.end()
-        }
-    }
-}
+// #[cfg(feature = "provider_serde")]
+// impl Serialize for Pattern<'_> {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: ser::Serializer,
+//     {
+//         if serializer.is_human_readable() {
+//             // Serialize into the UTS 35 string representation.
+//             let string: String = self.to_string();
+//             serializer.serialize_str(&string)
+//         } else {
+//             // Serialize into a bincode-friendly representation. This means that pattern parsing
+//             // will not be needed when deserializing.
+//             let mut seq = serializer.serialize_seq(Some(self.items.len()))?;
+//             for item in self.items.iter() {
+//                 seq.serialize_element(&item)?;
+//             }
+//             seq.end()
+//         }
+//     }
+// }
 
 /// Used to represent either H11/H12, or H23/H24. Skeletons only store these
 /// hour cycles as H12 or H23.

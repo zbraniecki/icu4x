@@ -105,30 +105,43 @@ impl<'data> IterableDataProviderCore for DatePatternsProvider<'data> {
     }
 }
 
-impl From<&cldr_json::LengthPatterns> for gregory::patterns::LengthPatternsV1 {
+impl From<&cldr_json::LengthPatterns> for gregory::patterns::LengthPatternsV1<'_> {
     fn from(other: &cldr_json::LengthPatterns) -> Self {
+        use icu_datetime::pattern::Pattern;
+        use icu_datetime::provider::gregory::patterns::PatternV1;
         // TODO(#308): Support numbering system variations. We currently throw them away.
         Self {
-            full: Cow::Owned(other.full.get_pattern().clone()),
-            long: Cow::Owned(other.long.get_pattern().clone()),
-            medium: Cow::Owned(other.medium.get_pattern().clone()),
-            short: Cow::Owned(other.short.get_pattern().clone()),
+            full: PatternV1::from(Pattern::from_bytes(other.full.get_pattern()).unwrap()),
+            long: PatternV1::from(Pattern::from_bytes(other.long.get_pattern()).unwrap()),
+            medium: PatternV1::from(Pattern::from_bytes(other.medium.get_pattern()).unwrap()),
+            short: PatternV1::from(Pattern::from_bytes(other.short.get_pattern()).unwrap()),
         }
     }
 }
 
-impl From<&cldr_json::DateTimeFormats> for gregory::patterns::DateTimeFormatsV1 {
+impl From<&cldr_json::DateTimeFormats> for gregory::patterns::DateTimeFormatsV1<'_> {
     fn from(other: &cldr_json::DateTimeFormats) -> Self {
         use gregory::patterns::{PatternV1, SkeletonV1, SkeletonsV1};
+        use icu_datetime::pattern::generic::GenericPattern;
+        use icu_datetime::provider::gregory::patterns::GenericPatternV1;
         use litemap::LiteMap;
 
         // TODO(#308): Support numbering system variations. We currently throw them away.
         Self {
-            length_patterns: gregory::patterns::LengthPatternsV1 {
-                full: Cow::Owned(other.full.get_pattern().clone()),
-                long: Cow::Owned(other.long.get_pattern().clone()),
-                medium: Cow::Owned(other.medium.get_pattern().clone()),
-                short: Cow::Owned(other.short.get_pattern().clone()),
+            length_patterns: gregory::patterns::LengthGenericPatternsV1 {
+                //XXX: Need PatternItems for combination pattern!
+                full: GenericPatternV1::from(
+                    GenericPattern::from_bytes(other.full.get_pattern()).unwrap(),
+                ),
+                long: GenericPatternV1::from(
+                    GenericPattern::from_bytes(other.long.get_pattern()).unwrap(),
+                ),
+                medium: GenericPatternV1::from(
+                    GenericPattern::from_bytes(other.medium.get_pattern()).unwrap(),
+                ),
+                short: GenericPatternV1::from(
+                    GenericPattern::from_bytes(other.short.get_pattern()).unwrap(),
+                ),
             },
             skeletons: {
                 let mut skeletons = SkeletonsV1(LiteMap::new());
@@ -179,8 +192,10 @@ impl From<&cldr_json::DateTimeFormats> for gregory::patterns::DateTimeFormatsV1 
     }
 }
 
-impl From<&cldr_json::Dates> for gregory::DatePatternsV1 {
+impl From<&cldr_json::Dates> for gregory::DatePatternsV1<'_> {
     fn from(other: &cldr_json::Dates) -> Self {
+        use icu_datetime::pattern::Pattern;
+        use icu_datetime::provider::gregory::patterns::PatternV1;
         let date_time_formats_v1 =
             gregory::patterns::DateTimeFormatsV1::from(&other.calendars.gregorian.datetime_formats);
 
@@ -228,38 +243,54 @@ impl From<&cldr_json::Dates> for gregory::DatePatternsV1 {
         let (time_h11_h12, time_h23_h24) = {
             let time = (&other.calendars.gregorian.time_formats).into();
             let alt_time = gregory::patterns::LengthPatternsV1 {
-                full: pattern::transform_hour_cycle::apply_coarse_hour_cycle(
-                    &date_time_formats_v1,
-                    pattern_str_full,
-                    pattern_full,
-                    alt_hour_cycle,
-                )
-                .expect("Failed to apply a coarse hour cycle to a full pattern.")
-                .into(),
-                long: pattern::transform_hour_cycle::apply_coarse_hour_cycle(
-                    &date_time_formats_v1,
-                    pattern_str_long,
-                    pattern_long,
-                    alt_hour_cycle,
-                )
-                .expect("Failed to apply a coarse hour cycle to a long pattern.")
-                .into(),
-                medium: pattern::transform_hour_cycle::apply_coarse_hour_cycle(
-                    &date_time_formats_v1,
-                    pattern_str_medium,
-                    pattern_medium,
-                    alt_hour_cycle,
-                )
-                .expect("Failed to apply a coarse hour cycle to a medium pattern.")
-                .into(),
-                short: pattern::transform_hour_cycle::apply_coarse_hour_cycle(
-                    &date_time_formats_v1,
-                    pattern_str_short,
-                    pattern_short,
-                    alt_hour_cycle,
-                )
-                .expect("Failed to apply a coarse hour cycle to a short pattern.")
-                .into(),
+                full: PatternV1::from(
+                    Pattern::from_bytes(
+                        &pattern::transform_hour_cycle::apply_coarse_hour_cycle(
+                            &date_time_formats_v1,
+                            pattern_str_full,
+                            pattern_full,
+                            alt_hour_cycle,
+                        )
+                        .expect("Failed to apply a coarse hour cycle to a full pattern."),
+                    )
+                    .unwrap(),
+                ),
+                long: PatternV1::from(
+                    Pattern::from_bytes(
+                        &pattern::transform_hour_cycle::apply_coarse_hour_cycle(
+                            &date_time_formats_v1,
+                            pattern_str_long,
+                            pattern_long,
+                            alt_hour_cycle,
+                        )
+                        .expect("Failed to apply a coarse hour cycle to a long pattern."),
+                    )
+                    .unwrap(),
+                ),
+                medium: PatternV1::from(
+                    Pattern::from_bytes(
+                        &pattern::transform_hour_cycle::apply_coarse_hour_cycle(
+                            &date_time_formats_v1,
+                            pattern_str_medium,
+                            pattern_medium,
+                            alt_hour_cycle,
+                        )
+                        .expect("Failed to apply a coarse hour cycle to a medium pattern."),
+                    )
+                    .unwrap(),
+                ),
+                short: PatternV1::from(
+                    Pattern::from_bytes(
+                        &pattern::transform_hour_cycle::apply_coarse_hour_cycle(
+                            &date_time_formats_v1,
+                            pattern_str_short,
+                            pattern_short,
+                            alt_hour_cycle,
+                        )
+                        .expect("Failed to apply a coarse hour cycle to a short pattern."),
+                    )
+                    .unwrap(),
+                ),
             };
 
             match preferred_hour_cycle {

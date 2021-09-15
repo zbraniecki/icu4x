@@ -52,10 +52,10 @@ where
     W: fmt::Write + ?Sized,
 {
     let pattern = &time_zone_format.pattern;
-    for item in pattern.items() {
+    for item in pattern.get().0.iter() {
         match item {
-            PatternItem::Field(field) => write_field(field, time_zone_format, time_zone, w)?,
-            PatternItem::Literal(l) => w.write_str(l)?,
+            PatternItem::Field(field) => write_field(&field, time_zone_format, time_zone, w)?,
+            PatternItem::Literal(l) => w.write_char(l)?,
         }
     }
     Ok(())

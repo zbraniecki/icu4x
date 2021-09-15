@@ -7,6 +7,7 @@ use core::{
     convert::TryFrom,
 };
 use displaydoc::Display;
+use zerovec::ule::{AsULE, ULE};
 
 #[derive(Display, Debug, PartialEq)]
 pub enum LengthError {
@@ -22,6 +23,7 @@ impl std::error::Error for LengthError {}
     feature = "provider_serde",
     derive(serde::Serialize, serde::Deserialize)
 )]
+#[repr(u8)]
 pub enum FieldLength {
     One = 1,
     TwoDigit = 2,
@@ -29,6 +31,12 @@ pub enum FieldLength {
     Wide = 4,
     Narrow = 5,
     Six = 6,
+}
+
+impl FieldLength {
+    pub fn u8_in_range(v: &u8) -> bool {
+        (1..=6).contains(v)
+    }
 }
 
 impl From<FieldLength> for u8 {
@@ -66,3 +74,42 @@ macro_rules! try_field_length {
 
 try_field_length!(u8);
 try_field_length!(usize);
+
+unsafe impl ULE for FieldLength {
+    type Error = ();
+
+    fn parse_byte_slice(bytes: &[u8]) -> Result<&[Self], Self::Error> {
+        if !bytes.iter().all(Self::u8_in_range) {
+            return Err(());
+        }
+        let data = bytes.as_ptr();
+        let len = bytes.len();
+        Ok(unsafe { core::slice::from_raw_parts(data as *const Self, len) })
+    }
+
+    unsafe fn from_byte_slice_unchecked(bytes: &[u8]) -> &[Self] {
+        let data = bytes.as_ptr();
+        let len = bytes.len();
+        core::slice::from_raw_parts(data as *const Self, len)
+    }
+
+    fn as_byte_slice(slice: &[Self]) -> &[u8] {
+        let data = slice.as_ptr();
+        let len = slice.len();
+        unsafe { core::slice::from_raw_parts(data as *const u8, len) }
+    }
+}
+
+impl AsULE for FieldLength {
+    type ULE = Self;
+
+    #[inline]
+    fn as_unaligned(&self) -> Self::ULE {
+        *self
+    }
+
+    #[inline]
+    fn from_unaligned(unaligned: &Self::ULE) -> Self {
+        *unaligned
+    }
+}

@@ -37,6 +37,7 @@ icu_provider = { version = "0.3", path = "../../provider/core", features = ["mac
 icu_calendar = { version = "0.3", path = "../calendar" }
 writeable = { version = "0.2", path = "../../utils/writeable" }
 litemap = { version = "0.2", path = "../../utils/litemap", features = ["serde"] }
+zerovec = { version = "0.3", path = "../../utils/zerovec", features = ["yoke", "serde"] }
 tinystr = { version = "0.4.10", features = ["alloc", "serde"], default-features = false }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"], optional = true }
 smallvec = "1.6"

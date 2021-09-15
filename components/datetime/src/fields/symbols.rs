@@ -5,6 +5,7 @@
 use crate::fields::FieldLength;
 use core::{cmp::Ordering, convert::TryFrom};
 use displaydoc::Display;
+use zerovec::ule::{AsULE, ULE};
 
 #[derive(Display, Debug, PartialEq)]
 pub enum SymbolError {
@@ -34,6 +35,44 @@ pub enum FieldSymbol {
     Minute,
     Second(Second),
     TimeZone(TimeZone),
+}
+
+impl From<u8> for FieldSymbol {
+    fn from(input: u8) -> Self {
+        let lower = input & 0b0000_1111;
+        let upper = input >> 4;
+
+        match lower {
+            0 => Self::Year(Year::from(upper)),
+            1 => Self::Month(Month::from(upper)),
+            2 => Self::Day(Day::from(upper)),
+            3 => Self::Weekday(Weekday::from(upper)),
+            4 => Self::DayPeriod(DayPeriod::from(upper)),
+            5 => Self::Hour(Hour::from(upper)),
+            6 => Self::Minute,
+            7 => Self::Second(Second::from(upper)),
+            8 => Self::TimeZone(TimeZone::from(upper)),
+            _ => panic!(),
+        }
+    }
+}
+
+impl From<FieldSymbol> for u8 {
+    fn from(input: FieldSymbol) -> Self {
+        let (lower, upper) = match input {
+            FieldSymbol::Year(year) => (0b0000, year as u8),
+            FieldSymbol::Month(month) => (0b0001, month as u8),
+            FieldSymbol::Day(day) => (0b0010, day as u8),
+            FieldSymbol::Weekday(wd) => (0b0011, wd as u8),
+            FieldSymbol::DayPeriod(dp) => (0b0100, dp as u8),
+            FieldSymbol::Hour(hour) => (0b0101, hour as u8),
+            FieldSymbol::Minute => (0b0110, 0),
+            FieldSymbol::Second(second) => (0b0111, second as u8),
+            FieldSymbol::TimeZone(tz) => (0b1000, tz as u8),
+        };
+        let result = upper << 4;
+        result | lower
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
@@ -89,34 +128,39 @@ impl FieldSymbol {
             Self::TimeZone(TimeZone::UpperX) => 27,
         }
     }
-}
 
-impl TryFrom<u8> for FieldSymbol {
-    type Error = SymbolError;
-    fn try_from(b: u8) -> Result<Self, Self::Error> {
-        match b {
-            b'm' => Ok(Self::Minute),
-            _ => Year::try_from(b)
-                .map(Self::Year)
-                .or_else(|_| Month::try_from(b).map(Self::Month))
-                .or_else(|_| Day::try_from(b).map(Self::Day))
-                .or_else(|_| Weekday::try_from(b).map(Self::Weekday))
-                .or_else(|_| DayPeriod::try_from(b).map(Self::DayPeriod))
-                .or_else(|_| Hour::try_from(b).map(Self::Hour))
-                .or_else(|_| Second::try_from(b).map(Self::Second))
-                .or_else(|_| TimeZone::try_from(b).map(Self::TimeZone)),
+    pub fn kv_in_range(kv: &u8) -> bool {
+        let k = kv & 0b0000_1111;
+        let v = kv >> 4;
+        match k {
+            0 => Year::u8_in_range(&v),
+            1 => Month::u8_in_range(&v),
+            2 => Day::u8_in_range(&v),
+            3 => Weekday::u8_in_range(&v),
+            4 => DayPeriod::u8_in_range(&v),
+            5 => Hour::u8_in_range(&v),
+            6 => true,
+            7 => Second::u8_in_range(&v),
+            8 => TimeZone::u8_in_range(&v),
+            _ => false,
         }
     }
 }
 
 impl TryFrom<char> for FieldSymbol {
     type Error = SymbolError;
-
     fn try_from(ch: char) -> Result<Self, Self::Error> {
-        if ch.is_ascii() {
-            Self::try_from(ch as u8)
-        } else {
-            Err(SymbolError::Invalid(ch))
+        match ch {
+            'm' => Ok(Self::Minute),
+            _ => Year::try_from(ch)
+                .map(Self::Year)
+                .or_else(|_| Month::try_from(ch).map(Self::Month))
+                .or_else(|_| Day::try_from(ch).map(Self::Day))
+                .or_else(|_| Weekday::try_from(ch).map(Self::Weekday))
+                .or_else(|_| DayPeriod::try_from(ch).map(Self::DayPeriod))
+                .or_else(|_| Hour::try_from(ch).map(Self::Hour))
+                .or_else(|_| Second::try_from(ch).map(Self::Second))
+                .or_else(|_| TimeZone::try_from(ch).map(Self::TimeZone)),
         }
     }
 }
@@ -184,47 +228,167 @@ impl Ord for FieldSymbol {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-#[cfg_attr(
-    feature = "provider_serde",
-    derive(serde::Serialize, serde::Deserialize)
-)]
-pub enum Year {
-    Calendar,
-    WeekOf,
+macro_rules! const_expr_count {
+    () => (0);
+    ($e:expr) => (1);
+    ($e:expr; $($other_e:expr);*) => ({
+        1 $(+ const_expr_count!($other_e) )*
+    });
+
+    ($e:expr; $($other_e:expr);* ; ) => (
+        const_expr_count! { $e; $($other_e);* }
+    );
 }
+
+macro_rules! field_type {
+    ($i:ident; { $($idx:expr; $key:expr => $val:ident),* }) => (
+        #[derive(Debug, Eq, PartialEq, Clone, Copy)]
+        #[cfg_attr(
+            feature = "provider_serde",
+            derive(serde::Serialize, serde::Deserialize)
+        )]
+        #[allow(clippy::enum_variant_names)]
+        #[repr(u8)]
+        pub enum $i {
+            $($val, )*
+        }
+
+
+        impl $i {
+            pub fn u8_in_range(v: &u8) -> bool {
+                let count = const_expr_count!($($key);*);
+                (0..count).contains(v)
+            }
+        }
+
+        impl From<u8> for $i {
+            fn from(input: u8) -> Self {
+                match input {
+                    $(
+                        $idx => Self::$val,
+                    )*
+                    _ => panic!(),
+                }
+            }
+        }
+
+
+        impl TryFrom<char> for $i {
+            type Error = SymbolError;
+            fn try_from(b: char) -> Result<Self, Self::Error> {
+                match b {
+                    $(
+                        $key => Ok(Self::$val),
+                    )*
+                    //XXX: Fix this - symbol is char
+                    b => Err(SymbolError::Unknown(b as u8)),
+                }
+            }
+        }
+
+        impl From<$i> for FieldSymbol {
+            fn from(input: $i) -> Self {
+                Self::$i(input)
+            }
+        }
+
+
+        unsafe impl ULE for $i {
+            type Error = ();
+
+            fn parse_byte_slice(bytes: &[u8]) -> Result<&[Self], Self::Error> {
+                if !bytes.iter().all(Self::u8_in_range) {
+                    return Err(());
+                }
+                let data = bytes.as_ptr();
+                let len = bytes.len();
+                Ok(unsafe { core::slice::from_raw_parts(data as *const Self, len) })
+            }
+
+            unsafe fn from_byte_slice_unchecked(bytes: &[u8]) -> &[Self] {
+                let data = bytes.as_ptr();
+                let len = bytes.len();
+                core::slice::from_raw_parts(data as *const Self, len)
+            }
+
+            fn as_byte_slice(slice: &[Self]) -> &[u8] {
+                let data = slice.as_ptr();
+                let len = slice.len();
+                unsafe { core::slice::from_raw_parts(data as *const u8, len) }
+            }
+        }
+
+        impl AsULE for $i {
+            type ULE = Self;
+
+            #[inline]
+            fn as_unaligned(&self) -> Self::ULE {
+                *self
+            }
+
+            #[inline]
+            fn from_unaligned(unaligned: &Self::ULE) -> Self {
+                *unaligned
+            }
+        }
+    );
+}
+
+field_type!(Year; {
+    0; 'y' => Calendar,
+    1; 'Y' => WeekOf
+});
+
+field_type!(Month; {
+    0; 'M' => Format,
+    1; 'L' => StandAlone
+});
+
+field_type!(Day; {
+    0; 'd' => DayOfMonth,
+    1; 'D' => DayOfYear,
+    2; 'F' => DayOfWeekInMonth,
+    3; 'g' => ModifiedJulianDay
+});
+
+field_type!(Weekday; {
+    0; 'E' => Format,
+    1; 'e' => Local,
+    2; 'c' => StandAlone
+});
+
+field_type!(DayPeriod; {
+    0; 'a' => AmPm,
+    1; 'b' => NoonMidnight
+});
+
+field_type!(Hour; {
+    0; 'K' => H11,
+    1; 'h' => H12,
+    2; 'H' => H23,
+    3; 'k' => H24
+});
+
+field_type!(Second; {
+    0; 's' => Second,
+    1; 'S' => FractionalSecond,
+    2; 'A' => Millisecond
+});
+
+field_type!(TimeZone; {
+    0; 'z' => LowerZ,
+    1; 'Z' => UpperZ,
+    2; 'O' => UpperO,
+    3; 'v' => LowerV,
+    4; 'V' => UpperV,
+    5; 'x' => LowerX,
+    6; 'X' => UpperX
+});
 
 impl LengthType for Year {
     fn get_length_type(&self, _length: FieldLength) -> TextOrNumeric {
         TextOrNumeric::Numeric
     }
-}
-
-impl TryFrom<u8> for Year {
-    type Error = SymbolError;
-    fn try_from(b: u8) -> Result<Self, Self::Error> {
-        match b {
-            b'y' => Ok(Self::Calendar),
-            b'Y' => Ok(Self::WeekOf),
-            b => Err(SymbolError::Unknown(b)),
-        }
-    }
-}
-
-impl From<Year> for FieldSymbol {
-    fn from(input: Year) -> Self {
-        Self::Year(input)
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-#[cfg_attr(
-    feature = "provider_serde",
-    derive(serde::Serialize, serde::Deserialize)
-)]
-pub enum Month {
-    Format,
-    StandAlone,
 }
 
 impl LengthType for Month {
@@ -240,71 +404,10 @@ impl LengthType for Month {
     }
 }
 
-impl TryFrom<u8> for Month {
-    type Error = SymbolError;
-    fn try_from(b: u8) -> Result<Self, Self::Error> {
-        match b {
-            b'M' => Ok(Self::Format),
-            b'L' => Ok(Self::StandAlone),
-            b => Err(SymbolError::Unknown(b)),
-        }
-    }
-}
-
-impl From<Month> for FieldSymbol {
-    fn from(input: Month) -> Self {
-        Self::Month(input)
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-#[cfg_attr(
-    feature = "provider_serde",
-    derive(serde::Serialize, serde::Deserialize)
-)]
-#[allow(clippy::enum_variant_names)]
-pub enum Day {
-    DayOfMonth,
-    DayOfYear,
-    DayOfWeekInMonth,
-    ModifiedJulianDay,
-}
-
 impl LengthType for Day {
     fn get_length_type(&self, _length: FieldLength) -> TextOrNumeric {
         TextOrNumeric::Numeric
     }
-}
-
-impl TryFrom<u8> for Day {
-    type Error = SymbolError;
-    fn try_from(b: u8) -> Result<Self, Self::Error> {
-        match b {
-            b'd' => Ok(Self::DayOfMonth),
-            b'D' => Ok(Self::DayOfYear),
-            b'F' => Ok(Self::DayOfWeekInMonth),
-            b'g' => Ok(Self::ModifiedJulianDay),
-            b => Err(SymbolError::Unknown(b)),
-        }
-    }
-}
-
-impl From<Day> for FieldSymbol {
-    fn from(input: Day) -> Self {
-        Self::Day(input)
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-#[cfg_attr(
-    feature = "provider_serde",
-    derive(serde::Serialize, serde::Deserialize)
-)]
-pub enum Hour {
-    H11,
-    H12,
-    H23,
-    H24,
 }
 
 impl LengthType for Hour {
@@ -313,70 +416,10 @@ impl LengthType for Hour {
     }
 }
 
-impl TryFrom<u8> for Hour {
-    type Error = SymbolError;
-    fn try_from(b: u8) -> Result<Self, Self::Error> {
-        match b {
-            b'K' => Ok(Self::H11),
-            b'h' => Ok(Self::H12),
-            b'H' => Ok(Self::H23),
-            b'k' => Ok(Self::H24),
-            b => Err(SymbolError::Unknown(b)),
-        }
-    }
-}
-
-impl From<Hour> for FieldSymbol {
-    fn from(input: Hour) -> Self {
-        Self::Hour(input)
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-#[cfg_attr(
-    feature = "provider_serde",
-    derive(serde::Serialize, serde::Deserialize)
-)]
-#[allow(clippy::enum_variant_names)]
-pub enum Second {
-    Second,
-    FractionalSecond,
-    Millisecond,
-}
-
 impl LengthType for Second {
     fn get_length_type(&self, _length: FieldLength) -> TextOrNumeric {
         TextOrNumeric::Numeric
     }
-}
-
-impl TryFrom<u8> for Second {
-    type Error = SymbolError;
-    fn try_from(b: u8) -> Result<Self, Self::Error> {
-        match b {
-            b's' => Ok(Self::Second),
-            b'S' => Ok(Self::FractionalSecond),
-            b'A' => Ok(Self::Millisecond),
-            b => Err(SymbolError::Unknown(b)),
-        }
-    }
-}
-
-impl From<Second> for FieldSymbol {
-    fn from(input: Second) -> Self {
-        Self::Second(input)
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-#[cfg_attr(
-    feature = "provider_serde",
-    derive(serde::Serialize, serde::Deserialize)
-)]
-pub enum Weekday {
-    Format,
-    Local,
-    StandAlone,
 }
 
 impl LengthType for Weekday {
@@ -391,70 +434,10 @@ impl LengthType for Weekday {
     }
 }
 
-impl TryFrom<u8> for Weekday {
-    type Error = SymbolError;
-    fn try_from(b: u8) -> Result<Self, Self::Error> {
-        match b {
-            b'E' => Ok(Self::Format),
-            b'e' => Ok(Self::Local),
-            b'c' => Ok(Self::StandAlone),
-            b => Err(SymbolError::Unknown(b)),
-        }
-    }
-}
-
-impl From<Weekday> for FieldSymbol {
-    fn from(input: Weekday) -> Self {
-        Self::Weekday(input)
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-#[cfg_attr(
-    feature = "provider_serde",
-    derive(serde::Serialize, serde::Deserialize)
-)]
-pub enum DayPeriod {
-    AmPm,
-    NoonMidnight,
-}
-
 impl LengthType for DayPeriod {
     fn get_length_type(&self, _length: FieldLength) -> TextOrNumeric {
         TextOrNumeric::Text
     }
-}
-
-impl TryFrom<u8> for DayPeriod {
-    type Error = SymbolError;
-    fn try_from(b: u8) -> Result<Self, Self::Error> {
-        match b {
-            b'a' => Ok(Self::AmPm),
-            b'b' => Ok(Self::NoonMidnight),
-            b => Err(SymbolError::Unknown(b)),
-        }
-    }
-}
-
-impl From<DayPeriod> for FieldSymbol {
-    fn from(input: DayPeriod) -> Self {
-        Self::DayPeriod(input)
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-#[cfg_attr(
-    feature = "provider_serde",
-    derive(serde::Serialize, serde::Deserialize)
-)]
-pub enum TimeZone {
-    LowerZ,
-    UpperZ,
-    UpperO,
-    LowerV,
-    UpperV,
-    LowerX,
-    UpperX,
 }
 
 impl LengthType for TimeZone {
@@ -482,27 +465,5 @@ impl LengthType for TimeZone {
             Self::LowerX | Self::UpperX => Numeric,
             Self::LowerZ | Self::LowerV | Self::UpperV => Text,
         }
-    }
-}
-
-impl TryFrom<u8> for TimeZone {
-    type Error = SymbolError;
-    fn try_from(b: u8) -> Result<Self, Self::Error> {
-        match b {
-            b'z' => Ok(Self::LowerZ),
-            b'Z' => Ok(Self::UpperZ),
-            b'O' => Ok(Self::UpperO),
-            b'v' => Ok(Self::LowerV),
-            b'V' => Ok(Self::UpperV),
-            b'x' => Ok(Self::LowerX),
-            b'X' => Ok(Self::UpperX),
-            b => Err(SymbolError::Unknown(b)),
-        }
-    }
-}
-
-impl From<TimeZone> for FieldSymbol {
-    fn from(input: TimeZone) -> Self {
-        Self::TimeZone(input)
     }
 }
