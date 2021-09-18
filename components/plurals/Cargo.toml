@@ -37,9 +37,11 @@ icu_provider = { version = "0.3", path = "../../provider/core", features = ["mac
 icu_locid = { version = "0.3", path = "../locid" }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"], optional = true }
 displaydoc = { version = "0.2.3", default-features = false }
+zerovec = { version = "0.3", path = "../../utils/zerovec", features = ["serde"] }
 
 [dev-dependencies]
 criterion = "0.3"
+iai = "0.1"
 icu = { path = "../icu", default-features = false }
 icu_benchmark_macros = { version = "0.3", path = "../../tools/benchmark/macros" }
 icu_provider = { version = "0.3", path = "../../provider/core" }
@@ -67,6 +69,10 @@ harness = false
 name = "parser"
 harness = false
 required-features = ["provider_serde"]
+
+[[bench]]
+name = "rules_iai"
+harness = false
 
 [[bench]]
 name = "pluralrules"

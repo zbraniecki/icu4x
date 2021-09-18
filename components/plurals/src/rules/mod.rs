@@ -147,6 +147,7 @@ pub mod ast;
 pub(crate) mod lexer;
 pub(crate) mod parser;
 pub(crate) mod resolver;
+pub mod runtime;
 pub(crate) mod serializer;
 
 pub use lexer::Lexer;
