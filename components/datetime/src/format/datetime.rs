@@ -5,7 +5,7 @@
 use crate::date::{DateTimeInput, DateTimeInputWithLocale, LocalizedDateTimeInput};
 use crate::error::DateTimeFormatError as Error;
 use crate::fields::{self, Field, FieldLength, FieldSymbol};
-use crate::pattern::{reference::Pattern, PatternItem};
+use crate::pattern::{runtime::Pattern, PatternItem};
 use crate::provider;
 use crate::provider::helpers::DateTimeSymbols;
 
@@ -46,7 +46,10 @@ pub struct FormattedDateTime<'l, T>
 where
     T: DateTimeInput,
 {
-    pub(crate) pattern: &'l Pattern,
+    pub(crate) pattern: &'l icu_provider::prelude::DataPayload<
+        'l,
+        provider::gregory::patterns::PatternFromPatternsV1Marker,
+    >,
     pub(crate) symbols: Option<&'l provider::gregory::DateSymbolsV1>,
     pub(crate) datetime: &'l T,
     pub(crate) locale: &'l Locale,
@@ -57,8 +60,9 @@ where
     T: DateTimeInput,
 {
     fn write_to<W: fmt::Write + ?Sized>(&self, sink: &mut W) -> fmt::Result {
-        write_pattern(self.pattern, self.symbols, self.datetime, self.locale, sink)
-            .map_err(|_| core::fmt::Error)
+        todo!()
+        // write_pattern(self.pattern, self.symbols, self.datetime, self.locale, sink)
+        //     .map_err(|_| core::fmt::Error)
     }
 
     // TODO(#489): Implement write_len
@@ -69,7 +73,8 @@ where
     T: DateTimeInput,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_pattern(self.pattern, self.symbols, self.datetime, self.locale, f)
+        let pattern = self.pattern.get().0.clone().into();
+        write_pattern(&pattern, self.symbols, self.datetime, self.locale, f)
             .map_err(|_| core::fmt::Error)
     }
 }
@@ -95,7 +100,7 @@ where
 }
 
 pub fn write_pattern<T, W>(
-    pattern: &crate::pattern::reference::Pattern,
+    pattern: &crate::pattern::runtime::Pattern,
     symbols: Option<&provider::gregory::DateSymbolsV1>,
     datetime: &T,
     locale: &Locale,
@@ -109,7 +114,7 @@ where
     for item in pattern.items() {
         match item {
             PatternItem::Field(field) => write_field(pattern, field, symbols, &loc_datetime, w)?,
-            PatternItem::Literal(ch) => w.write_char(*ch)?,
+            PatternItem::Literal(ch) => w.write_char(ch)?,
         }
     }
     Ok(())
@@ -121,8 +126,8 @@ where
 // When modifying the list of fields using symbols,
 // update the matching query in `analyze_pattern` function.
 pub(super) fn write_field<T, W>(
-    pattern: &crate::pattern::reference::Pattern,
-    field: &fields::Field,
+    pattern: &crate::pattern::runtime::Pattern,
+    field: fields::Field,
     symbols: Option<&crate::provider::gregory::DateSymbolsV1>,
     datetime: &impl LocalizedDateTimeInput<T>,
     w: &mut W,
@@ -251,8 +256,8 @@ where
 
 // This function determins whether the struct will load symbols data.
 // Keep it in sync with the `write_field` use of symbols.
-pub fn analyze_pattern(pattern: &Pattern, supports_time_zones: bool) -> Result<bool, &Field> {
-    let fields = pattern.items().iter().filter_map(|p| match p {
+pub fn analyze_pattern(pattern: &Pattern, supports_time_zones: bool) -> Result<bool, Field> {
+    let fields = pattern.items().filter_map(|p| match p {
         PatternItem::Field(field) => Some(field),
         _ => None,
     });
@@ -311,7 +316,7 @@ mod tests {
             .unwrap()
             .take_payload()
             .unwrap();
-        let pattern = crate::pattern::reference::Pattern::from_bytes("MMM").unwrap();
+        let pattern = crate::pattern::reference::Pattern::from_bytes("MMM").unwrap().into();
         let datetime =
             DateTime::new_gregorian_datetime_from_integers(2020, 8, 1, 12, 34, 28).unwrap();
         let mut sink = String::new();

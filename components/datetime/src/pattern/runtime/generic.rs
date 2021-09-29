@@ -10,8 +10,22 @@ use super::{
 use alloc::vec::Vec;
 use zerovec::{ule::AsULE, ZeroVec};
 
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(
+    feature = "provider_serde",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct GenericPattern<'data> {
+    #[cfg_attr(feature = "provider_serde", serde(borrow))]
     pub items: ZeroVec<'data, GenericPatternItem>,
+}
+
+impl Default for GenericPattern<'_> {
+    fn default() -> Self {
+        Self {
+            items: ZeroVec::Owned(Vec::new()),
+        }
+    }
 }
 
 impl<'data> GenericPattern<'data> {

@@ -58,19 +58,19 @@ where
     let locale = &zoned_datetime_format.datetime_format.locale;
     let pattern = &zoned_datetime_format.datetime_format.pattern;
     let loc_datetime = ZonedDateTimeInputWithLocale::new(zoned_datetime, locale);
-    for item in pattern.items() {
+    for item in pattern.get().0.items() {
         match item {
             PatternItem::Field(field) => {
                 write_field(field, zoned_datetime_format, &loc_datetime, w)?
             }
-            PatternItem::Literal(ch) => w.write_char(*ch)?,
+            PatternItem::Literal(ch) => w.write_char(ch)?,
         }
     }
     Ok(())
 }
 
 fn write_field<T, W>(
-    field: &fields::Field,
+    field: fields::Field,
     zoned_datetime_format: &ZonedDateTimeFormat,
     loc_datetime: &impl LocalizedDateTimeInput<T>,
     w: &mut W,
@@ -93,7 +93,7 @@ where
             loc_datetime.datetime(),
             w,
         )?,
-        _ => datetime::write_field(pattern, field, symbols, loc_datetime, w)?,
+        _ => datetime::write_field(&pattern.get().0, field, symbols, loc_datetime, w)?,
     }
     Ok(())
 }

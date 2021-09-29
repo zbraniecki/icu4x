@@ -52,10 +52,10 @@ where
     W: fmt::Write + ?Sized,
 {
     let pattern = &time_zone_format.pattern;
-    for item in pattern.items() {
+    for item in pattern.get().0.items() {
         match item {
             PatternItem::Field(field) => write_field(field, time_zone_format, time_zone, w)?,
-            PatternItem::Literal(ch) => w.write_char(*ch)?,
+            PatternItem::Literal(ch) => w.write_char(ch)?,
         }
     }
     Ok(())
@@ -64,7 +64,7 @@ where
 /// Write fields according to the UTS-35 specification.
 /// https://unicode.org/reports/tr35/tr35-dates.html#dfst-zone
 pub(super) fn write_field<T, W>(
-    field: &fields::Field,
+    field: fields::Field,
     time_zone_format: &TimeZoneFormat,
     time_zone: &T,
     w: &mut W,

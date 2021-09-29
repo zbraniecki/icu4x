@@ -3,7 +3,7 @@
 // (online at: https://github.com/unicode-org/icu4x/blob/main/LICENSE ).
 
 mod error;
-mod hour_cycle;
+pub(crate) mod hour_cycle;
 mod item;
 pub mod reference;
 pub mod runtime;
@@ -11,6 +11,7 @@ pub mod runtime;
 use crate::fields;
 pub use error::PatternError;
 pub use hour_cycle::CoarseHourCycle;
+use icu_provider::yoke::{self, Yokeable, ZeroCopyFrom};
 pub use item::{GenericPatternItem, PatternItem};
 
 /// The granularity of time represented in a pattern item.
@@ -20,6 +21,7 @@ pub use item::{GenericPatternItem, PatternItem};
     feature = "provider_serde",
     derive(serde::Serialize, serde::Deserialize)
 )]
+#[derive(Yokeable, ZeroCopyFrom)]
 pub(crate) enum TimeGranularity {
     None,
     Hours,

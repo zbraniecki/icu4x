@@ -11,7 +11,16 @@ use crate::{
     date::TimeZoneInput, format::time_zone::FormattedTimeZone, pattern::PatternError, provider,
     DateTimeFormatError,
 };
-use crate::{format::time_zone, provider::time_zones::TimeZoneFormatsV1Marker};
+use crate::{
+    format::time_zone,
+    provider::{
+        gregory::{
+            patterns::{PatternFromPatternsV1Marker, PatternV1},
+            DatePatternsV1Marker, DateSymbolsV1Marker,
+        },
+        time_zones::TimeZoneFormatsV1Marker,
+    },
+};
 use icu_locid::{LanguageIdentifier, Locale};
 use icu_provider::prelude::*;
 
@@ -89,7 +98,7 @@ where
 // TODO(#622) Make TimeZoneFormat public once we have a clean way to provide it options.
 pub(super) struct TimeZoneFormat<'data> {
     /// The pattern to format.
-    pub(super) pattern: Pattern,
+    pub(super) pattern: DataPayload<'data, PatternFromPatternsV1Marker>,
     /// The data that contains meta information about how to display content.
     pub(super) zone_formats: DataPayload<'data, provider::time_zones::TimeZoneFormatsV1Marker>,
     /// The exemplar cities for time zones.
@@ -134,7 +143,7 @@ impl<'data> TimeZoneFormat<'data> {
     // TODO(#622) Make this public once TimeZoneFormat is public.
     pub(super) fn try_new<L, ZP>(
         locale: L,
-        pattern: Pattern,
+        pattern: DataPayload<'data, PatternFromPatternsV1Marker>,
         zone_provider: &ZP,
     ) -> Result<Self, DateTimeFormatError>
     where
@@ -173,8 +182,9 @@ impl<'data> TimeZoneFormat<'data> {
 
         let zone_symbols = time_zone_format
             .pattern
-            .items
-            .iter()
+            .get()
+            .0
+            .items()
             .filter_map(|item| match item {
                 PatternItem::Field(field) => Some(field),
                 _ => None,

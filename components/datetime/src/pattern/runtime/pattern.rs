@@ -7,6 +7,7 @@ use crate::pattern::reference::pattern::dump_buffer_into_formatter;
 use alloc::fmt::{self, Write};
 use alloc::string::String;
 use alloc::{vec, vec::Vec};
+use icu_provider::yoke::{self, Yokeable, ZeroCopyFrom};
 use zerovec::ZeroVec;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -14,10 +15,17 @@ use zerovec::ZeroVec;
     feature = "provider_serde",
     derive(serde::Serialize, serde::Deserialize)
 )]
+#[derive(Yokeable, ZeroCopyFrom)]
 pub struct Pattern<'data> {
     #[cfg_attr(feature = "provider_serde", serde(borrow))]
-    pub items: ZeroVec<'data, PatternItem>,
+    pub(crate) items: ZeroVec<'data, PatternItem>,
     pub(crate) time_granularity: TimeGranularity,
+}
+
+impl<'data> Pattern<'data> {
+    pub fn items(&'data self) -> impl Iterator<Item = PatternItem> + 'data {
+        self.items.iter()
+    }
 }
 
 impl From<Vec<PatternItem>> for Pattern<'_> {
@@ -25,6 +33,15 @@ impl From<Vec<PatternItem>> for Pattern<'_> {
         Self {
             time_granularity: items.iter().map(Into::into).max().unwrap_or_default(),
             items: ZeroVec::clone_from_slice(&items),
+        }
+    }
+}
+
+impl<'data> From<ZeroVec<'data, PatternItem>> for Pattern<'data> {
+    fn from(items: ZeroVec<'data, PatternItem>) -> Self {
+        Self {
+            time_granularity: items.iter().map(|i| (&i).into()).max().unwrap_or_default(),
+            items,
         }
     }
 }

@@ -9,7 +9,10 @@ use crate::{
     format::datetime,
     options::DateTimeFormatOptions,
     provider::{
-        gregory::{DatePatternsV1Marker, DateSymbolsV1Marker},
+        gregory::{
+            patterns::{PatternFromPatternsV1Marker, PatternV1},
+            DatePatternsV1Marker, DateSymbolsV1Marker,
+        },
         helpers::DateTimePatterns,
     },
 };
@@ -18,9 +21,14 @@ use icu_locid::Locale;
 use icu_provider::prelude::*;
 
 use crate::{
-    date::DateTimeInput, pattern::reference::Pattern, provider, DateTimeFormatError,
+    date::DateTimeInput, pattern::runtime::Pattern, provider, DateTimeFormatError,
     FormattedDateTime,
 };
+
+enum SelectedPattern<'data> {
+    Payload(DataPayload<'data, PatternFromPatternsV1Marker>),
+    Custom(crate::pattern::reference::Pattern),
+}
 
 /// [`DateTimeFormat`] is the main structure of the [`icu_datetime`] component.
 /// When constructed, it uses data from the [`DataProvider`], selected [`Locale`] and provided options to
@@ -64,7 +72,7 @@ use crate::{
 /// when we introduce asynchronous [`DataProvider`] and corresponding asynchronous constructor.
 pub struct DateTimeFormat<'data> {
     pub(super) locale: Locale,
-    pub(super) pattern: Pattern,
+    pub(super) pattern: DataPayload<'data, PatternFromPatternsV1Marker>,
     pub(super) symbols: Option<DataPayload<'data, DateSymbolsV1Marker>>,
 }
 
@@ -115,12 +123,18 @@ impl<'data> DateTimeFormat<'data> {
                 })?
                 .take_payload()?;
 
-        let pattern = patterns_data
-            .get()
-            .get_pattern_for_options(options)?
-            .unwrap_or_default();
+        // TODO: Consider making DateTimeFormatOptions implement Copy or taking it by value
+        // in the argument to this function.
+        let options: DateTimeFormatOptions = (*options).clone();
 
-        let requires_data = datetime::analyze_pattern(&pattern, false)
+        let selected_pattern: DataPayload<'data, PatternFromPatternsV1Marker> = patterns_data
+            .map_project_with_capture(options, |data, options, _| {
+                data.get_pattern_for_options(&options)
+                    .unwrap()
+                    .unwrap_or_default()
+            });
+
+        let requires_data = datetime::analyze_pattern(&selected_pattern.get().0, false)
             .map_err(|field| DateTimeFormatError::UnsupportedField(field.symbol))?;
 
         let symbols_data = if requires_data {
@@ -141,7 +155,7 @@ impl<'data> DateTimeFormat<'data> {
             None
         };
 
-        Ok(Self::new(locale, pattern, symbols_data))
+        Ok(Self::new(locale, selected_pattern, symbols_data))
     }
 
     /// Creates a new [`DateTimeFormat`] regardless of whether there are time-zone symbols in the pattern.
@@ -159,7 +173,7 @@ impl<'data> DateTimeFormat<'data> {
     /// [`ZonedDateTimeFormat`]: crate::zoned_datetime::ZonedDateTimeFormat
     pub(super) fn new<T: Into<Locale>>(
         locale: T,
-        pattern: Pattern,
+        pattern: DataPayload<'data, PatternFromPatternsV1Marker>,
         symbols: Option<DataPayload<'data, DateSymbolsV1Marker>>,
     ) -> Self {
         let locale = locale.into();
@@ -199,7 +213,7 @@ impl<'data> DateTimeFormat<'data> {
     /// At the moment, there's little value in using that over one of the other `format` methods,
     /// but [`FormattedDateTime`] will grow with methods for iterating over fields, extracting information
     /// about formatted date and so on.
-    pub fn format<'l, T>(&'l self, value: &'l T) -> FormattedDateTime<'l, T>
+    pub fn format<'l: 'data, T>(&'l self, value: &'l T) -> FormattedDateTime<'l, T>
     where
         T: DateTimeInput,
     {
@@ -243,7 +257,7 @@ impl<'data> DateTimeFormat<'data> {
         value: &impl DateTimeInput,
     ) -> core::fmt::Result {
         datetime::write_pattern(
-            &self.pattern,
+            &self.pattern.get().0,
             self.symbols.as_ref().map(|s| s.get()),
             value,
             &self.locale,

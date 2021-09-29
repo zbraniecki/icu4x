@@ -28,12 +28,12 @@ pub struct Pattern {
 }
 
 impl Pattern {
-    pub fn items(&self) -> &[PatternItem] {
-        &self.items
+    pub fn items<'p>(&'p self) -> impl Iterator<Item = PatternItem> + 'p {
+        self.items.iter().copied()
     }
 
-    pub fn items_mut(&mut self) -> &mut [PatternItem] {
-        &mut self.items
+    pub fn items_mut<'p>(&'p mut self) -> impl Iterator<Item = &mut PatternItem> + 'p {
+        self.items.iter_mut()
     }
 
     pub fn from_bytes(input: &str) -> Result<Self, PatternError> {

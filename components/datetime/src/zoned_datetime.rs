@@ -5,6 +5,7 @@
 use alloc::string::String;
 use icu_locid::Locale;
 use icu_provider::{DataProvider, DataRequest, ResourceOptions, ResourcePath};
+use icu_provider::prelude::*;
 
 use crate::{
     date::ZonedDateTimeInput,
@@ -14,7 +15,11 @@ use crate::{
         zoned_datetime::{self, FormattedZonedDateTime},
     },
     options::DateTimeFormatOptions,
-    provider::{self, helpers::DateTimePatterns},
+    provider::{self, 
+        gregory::{
+            patterns::{PatternFromPatternsV1Marker, PatternV1},
+        },
+        helpers::DateTimePatterns},
     time_zone::TimeZoneFormat,
     DateTimeFormatError,
 };
@@ -125,12 +130,18 @@ impl<'data> ZonedDateTimeFormat<'data> {
                 })?
                 .take_payload()?;
 
-        let pattern = pattern_data
-            .get()
-            .get_pattern_for_options(options)?
-            .unwrap_or_default();
+        // TODO: Consider making DateTimeFormatOptions implement Copy or taking it by value
+        // in the argument to this function.
+        let options: DateTimeFormatOptions = (*options).clone();
 
-        let requires_data = datetime::analyze_pattern(&pattern, true)
+        let selected_pattern: DataPayload<'data, PatternFromPatternsV1Marker> = pattern_data
+            .map_project_with_capture(options, |data, options, _| {
+                data.get_pattern_for_options(&options)
+                    .unwrap()
+                    .unwrap_or_default()
+            });
+
+        let requires_data = datetime::analyze_pattern(&selected_pattern.get().0, true)
             .map_err(|field| DateTimeFormatError::UnsupportedField(field.symbol))?;
 
         let symbols_data = if requires_data {
@@ -151,7 +162,7 @@ impl<'data> ZonedDateTimeFormat<'data> {
             None
         };
 
-        let datetime_format = DateTimeFormat::new(locale, pattern, symbols_data);
+        let datetime_format = DateTimeFormat::new(locale, selected_pattern, symbols_data);
         let time_zone_format = TimeZoneFormat::try_new(
             datetime_format.locale.clone(),
             datetime_format.pattern.clone(),

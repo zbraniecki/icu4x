@@ -6,32 +6,37 @@ use crate::date;
 use crate::error::DateTimeFormatError;
 use crate::fields;
 use crate::options::{components, length, preferences, DateTimeFormatOptions};
-use crate::pattern::{reference::Pattern, PatternItem};
+use crate::pattern::{runtime::Pattern, PatternItem, hour_cycle};
 use crate::provider;
+use crate::provider::gregory::patterns::PatternV1;
 use crate::skeleton;
 use alloc::borrow::Cow;
+use zerovec::{ule::AsULE, ZeroVec};
 
 type Result<T> = core::result::Result<T, DateTimeFormatError>;
 
-pub trait DateTimePatterns {
-    fn get_pattern_for_options(&self, options: &DateTimeFormatOptions) -> Result<Option<Pattern>>;
+pub trait DateTimePatterns<'data> {
+    fn get_pattern_for_options(
+        self,
+        options: &DateTimeFormatOptions,
+    ) -> Result<Option<PatternV1<'data>>>;
     fn get_pattern_for_components_bag(
-        &self,
+        self,
         components: &components::Bag,
-    ) -> Result<Option<Pattern>>;
-    fn get_pattern_for_length_bag(&self, length: &length::Bag) -> Result<Option<Pattern>>;
-    fn get_pattern_for_date_length(&self, length: length::Date) -> Result<Pattern>;
+    ) -> Result<Option<PatternV1<'data>>>;
+    fn get_pattern_for_length_bag(self, length: &length::Bag) -> Result<Option<PatternV1<'data>>>;
+    fn get_pattern_for_date_length(self, length: length::Date) -> Result<PatternV1<'data>>;
     fn get_pattern_for_time_length(
-        &self,
+        self,
         length: length::Time,
         preferences: &Option<preferences::Bag>,
-    ) -> Result<Pattern>;
+    ) -> Result<PatternV1<'data>>;
     fn get_pattern_for_datetime_length(
-        &self,
+        self,
         length: length::Date,
-        date: Pattern,
-        time: Pattern,
-    ) -> Result<Pattern>;
+        date: Pattern<'data>,
+        time: Pattern<'data>,
+    ) -> Result<PatternV1<'data>>;
 }
 
 pub trait DateTimeSymbols {
@@ -56,8 +61,11 @@ pub trait DateTimeSymbols {
     ) -> &Cow<str>;
 }
 
-impl DateTimePatterns for provider::gregory::DatePatternsV1 {
-    fn get_pattern_for_options(&self, options: &DateTimeFormatOptions) -> Result<Option<Pattern>> {
+impl<'data> DateTimePatterns<'data> for provider::gregory::DatePatternsV1<'data> {
+    fn get_pattern_for_options(
+        self,
+        options: &DateTimeFormatOptions,
+    ) -> Result<Option<PatternV1<'data>>> {
         match options {
             DateTimeFormatOptions::Length(bag) => self.get_pattern_for_length_bag(bag),
             DateTimeFormatOptions::Components(bag) => self.get_pattern_for_components_bag(bag),
@@ -65,15 +73,15 @@ impl DateTimePatterns for provider::gregory::DatePatternsV1 {
     }
 
     fn get_pattern_for_components_bag(
-        &self,
+        self,
         components: &components::Bag,
-    ) -> Result<Option<Pattern>> {
+    ) -> Result<Option<PatternV1<'data>>> {
         // Not all skeletons are currently supported.
         let requested_fields = components.to_vec_fields();
         Ok(
             match skeleton::create_best_pattern_for_fields(
-                &self.datetime.skeletons,
-                &self.datetime.length_patterns,
+                self.datetime.skeletons,
+                self.datetime.length_patterns,
                 &requested_fields,
                 components,
                 false, // Prefer the requested fields over the matched pattern.
@@ -85,7 +93,7 @@ impl DateTimePatterns for provider::gregory::DatePatternsV1 {
         )
     }
 
-    fn get_pattern_for_length_bag(&self, length: &length::Bag) -> Result<Option<Pattern>> {
+    fn get_pattern_for_length_bag(self, length: &length::Bag) -> Result<Option<PatternV1<'data>>> {
         match (length.date, length.time) {
             (None, None) => Ok(None),
             (None, Some(time_length)) => self
@@ -93,50 +101,51 @@ impl DateTimePatterns for provider::gregory::DatePatternsV1 {
                 .map(Some),
             (Some(date_length), None) => self.get_pattern_for_date_length(date_length).map(Some),
             (Some(date_length), Some(time_length)) => {
-                let time = self.get_pattern_for_time_length(time_length, &length.preferences)?;
-                let date = self.get_pattern_for_date_length(date_length)?;
+                let time = self.clone().get_pattern_for_time_length(time_length, &length.preferences)?;
+                let date = self.clone().get_pattern_for_date_length(date_length)?;
 
-                self.get_pattern_for_datetime_length(date_length, date, time)
+                self.get_pattern_for_datetime_length(date_length, date.0, time.0)
                     .map(Some)
             }
         }
     }
 
-    fn get_pattern_for_date_length(&self, length: length::Date) -> Result<Pattern> {
-        let date = &self.date;
+    fn get_pattern_for_date_length(self, length: length::Date) -> Result<PatternV1<'data>> {
+        let date = self.date;
         let s = match length {
-            length::Date::Full => &date.full,
-            length::Date::Long => &date.long,
-            length::Date::Medium => &date.medium,
-            length::Date::Short => &date.short,
+            length::Date::Full => date.full,
+            length::Date::Long => date.long,
+            length::Date::Medium => date.medium,
+            length::Date::Short => date.short,
         };
-        Ok(Pattern::from_bytes(s)?)
+        Ok(s)
     }
 
     fn get_pattern_for_datetime_length(
-        &self,
+        self,
         length: length::Date,
-        date: Pattern,
-        time: Pattern,
-    ) -> Result<Pattern> {
-        let datetime = &self.datetime;
+        date: Pattern<'data>,
+        time: Pattern<'data>,
+    ) -> Result<PatternV1<'data>> {
+        let datetime = self.datetime;
         let s = match length {
-            length::Date::Full => &datetime.length_patterns.full,
-            length::Date::Long => &datetime.length_patterns.long,
-            length::Date::Medium => &datetime.length_patterns.medium,
-            length::Date::Short => &datetime.length_patterns.short,
+            length::Date::Full => datetime.length_patterns.full,
+            length::Date::Long => datetime.length_patterns.long,
+            length::Date::Medium => datetime.length_patterns.medium,
+            length::Date::Short => datetime.length_patterns.short,
         };
-        Ok(Pattern::from_bytes_combination(s, date, time)?)
+        let pattern = s.combined(alloc::vec![date, time])?;
+        Ok(PatternV1::from(pattern))
     }
 
     /// Look up the proper pre-computed pattern for a given length. If a preference for an hour
     /// cycle is set, it will look look up a pattern in the time_h11_12 or time_h23_h24 provider
     /// data, and then manually modify the symbol in the pattern if needed.
     fn get_pattern_for_time_length(
-        &self,
+        self,
         length: length::Time,
         preferences: &Option<preferences::Bag>,
-    ) -> Result<Pattern> {
+    ) -> Result<PatternV1<'data>> {
         // Determine the coarse hour cycle patterns to use from either the preference bag,
         // or the preferred hour cycle for the locale.
         let time = if let Some(preferences::Bag {
@@ -144,38 +153,27 @@ impl DateTimePatterns for provider::gregory::DatePatternsV1 {
         }) = preferences
         {
             match hour_cycle_pref {
-                preferences::HourCycle::H11 | preferences::HourCycle::H12 => &self.time_h11_h12,
-                preferences::HourCycle::H23 | preferences::HourCycle::H24 => &self.time_h23_h24,
+                preferences::HourCycle::H11 | preferences::HourCycle::H12 => self.time_h11_h12,
+                preferences::HourCycle::H23 | preferences::HourCycle::H24 => self.time_h23_h24,
             }
         } else {
             match self.preferred_hour_cycle {
-                crate::pattern::CoarseHourCycle::H11H12 => &self.time_h11_h12,
-                crate::pattern::CoarseHourCycle::H23H24 => &self.time_h23_h24,
+                crate::pattern::CoarseHourCycle::H11H12 => self.time_h11_h12,
+                crate::pattern::CoarseHourCycle::H23H24 => self.time_h23_h24,
             }
         };
 
-        let mut pattern = Pattern::from_bytes(match length {
-            length::Time::Full => &time.full,
-            length::Time::Long => &time.long,
-            length::Time::Medium => &time.medium,
-            length::Time::Short => &time.short,
-        })?;
+        let mut pattern = match length {
+            length::Time::Full => time.full,
+            length::Time::Long => time.long,
+            length::Time::Medium => time.medium,
+            length::Time::Short => time.short,
+        };
 
-        if let Some(preferences::Bag {
-            hour_cycle: Some(hour_cycle_pref),
-        }) = preferences
-        {
-            // Apply the preference::Bag override and change the pattern from a coarse hour cycle
-            // to the specific hour cycle.
-            for item in pattern.items_mut() {
-                if let PatternItem::Field(fields::Field { symbol, length: _ }) = item {
-                    if let fields::FieldSymbol::Hour(_) = symbol {
-                        *symbol = fields::FieldSymbol::Hour(hour_cycle_pref.field());
-                    }
-                }
-            }
-        }
-
+        hour_cycle::naively_apply_preferences(
+            &mut pattern.0,
+            preferences
+        );
         Ok(pattern)
     }
 }

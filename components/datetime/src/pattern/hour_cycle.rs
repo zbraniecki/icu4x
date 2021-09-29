@@ -2,10 +2,11 @@
 // called LICENSE at the top level of the ICU4X source tree
 // (online at: https://github.com/unicode-org/icu4x/blob/main/LICENSE ).
 
-use super::{reference::Pattern, PatternItem};
+use super::{runtime::Pattern, PatternItem};
 use crate::fields;
 #[cfg(feature = "provider_transform_internals")]
 use crate::{provider, skeleton};
+use crate::options::preferences;
 
 /// Used to represent either H11/H12, or H23/H24. Skeletons only store these
 /// hour cycles as H12 or H23.
@@ -51,15 +52,17 @@ impl CoarseHourCycle {
 
     /// Invoke the pattern matching machinery to transform the hour cycle of a pattern. This provides
     /// a safe mapping from a h11/h12 to h23/h24 for transforms.
+    ///
+    /// This function is not optimized for runtime performance.
     #[doc(hidden)]
     #[cfg(feature = "provider_transform_internals")]
-    pub fn apply_on_pattern(
+    pub fn apply_on_pattern<'data>(
         &self,
-        datetime: &provider::gregory::patterns::DateTimeFormatsV1,
-        pattern_str: &str,
-        mut pattern: Pattern,
-    ) -> Option<String> {
-        for item in pattern.items_mut() {
+        pattern: &Pattern<'data>,
+        datetime: &provider::gregory::patterns::DateTimeFormatsV1<'data>,
+    ) -> Option<Pattern<'data>> {
+        let mut items: Vec<PatternItem> = pattern.items().collect();
+        for item in items.iter_mut() {
             if let PatternItem::Field(fields::Field { symbol, length: _ }) = item {
                 if let fields::FieldSymbol::Hour(pattern_hour) = symbol {
                     if match self {
@@ -74,7 +77,7 @@ impl CoarseHourCycle {
                     } {
                         // The preference hour cycle matches the pattern, bail out early and
                         // return the current pattern.
-                        return Some(pattern_str.into());
+                        return Some(Pattern::from(items));
                     } else {
                         // Mutate the pattern with the new symbol, so that it can be matched against.
                         *symbol = fields::FieldSymbol::Hour(match self {
@@ -87,11 +90,12 @@ impl CoarseHourCycle {
             }
         }
 
+        let pattern = Pattern::from(items);
         let skeleton = skeleton::Skeleton::from(&pattern);
 
         match skeleton::create_best_pattern_for_fields(
-            &datetime.skeletons,
-            &datetime.length_patterns,
+            datetime.clone().skeletons,
+            datetime.clone().length_patterns,
             skeleton.as_slice(),
             &Default::default(),
             // Prefer using the matched pattern directly, rather than mutating it to match the
@@ -99,8 +103,30 @@ impl CoarseHourCycle {
             true,
         ) {
             skeleton::BestSkeleton::AllFieldsMatch(pattern)
-            | skeleton::BestSkeleton::MissingOrExtraFields(pattern) => Some(format!("{}", pattern)),
+            | skeleton::BestSkeleton::MissingOrExtraFields(pattern) => Some(pattern.0),
             skeleton::BestSkeleton::NoMatch => None,
         }
+    }
+}
+
+/// The hour cycle can be set by preferences. This function switches between h11 and h12,
+/// and between h23 and h24. This function is naive as it is assumed that this application of
+/// the hour cycle will not change between h1x to h2x.
+pub(crate) fn naively_apply_preferences<'data>(
+    pattern: &mut Pattern<'data>,
+    preferences: &Option<preferences::Bag>,
+) {
+    // If there is a preference overiding the hour cycle, apply it now.
+    if let Some(preferences::Bag {
+        hour_cycle: Some(hour_cycle),
+    }) = preferences
+    {
+        pattern.items.for_each_mut(|item| {
+            if let PatternItem::Field(fields::Field { ref mut symbol, .. }) = item {
+                if let fields::FieldSymbol::Hour(_) = symbol {
+                    *symbol = fields::FieldSymbol::Hour(hour_cycle.field());
+                }
+            }
+        });
     }
 }

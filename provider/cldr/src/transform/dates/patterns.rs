@@ -105,30 +105,41 @@ impl<'data> IterableDataProviderCore for DatePatternsProvider<'data> {
     }
 }
 
-impl From<&cldr_json::LengthPatterns> for gregory::patterns::LengthPatternsV1 {
+impl From<&cldr_json::LengthPatterns> for gregory::patterns::LengthPatternsV1<'_> {
     fn from(other: &cldr_json::LengthPatterns) -> Self {
+        use icu_datetime::pattern::reference::Pattern;
+        use icu_datetime::provider::gregory::patterns::PatternV1;
         // TODO(#308): Support numbering system variations. We currently throw them away.
         Self {
-            full: Cow::Owned(other.full.get_pattern().clone()),
-            long: Cow::Owned(other.long.get_pattern().clone()),
-            medium: Cow::Owned(other.medium.get_pattern().clone()),
-            short: Cow::Owned(other.short.get_pattern().clone()),
+            full: PatternV1::from(Pattern::from_bytes(other.full.get_pattern()).unwrap()),
+            long: PatternV1::from(Pattern::from_bytes(other.long.get_pattern()).unwrap()),
+            medium: PatternV1::from(Pattern::from_bytes(other.medium.get_pattern()).unwrap()),
+            short: PatternV1::from(Pattern::from_bytes(other.short.get_pattern()).unwrap()),
         }
     }
 }
 
-impl From<&cldr_json::DateTimeFormats> for gregory::patterns::DateTimeFormatsV1 {
+impl From<&cldr_json::DateTimeFormats> for gregory::patterns::DateTimeFormatsV1<'_> {
     fn from(other: &cldr_json::DateTimeFormats) -> Self {
         use gregory::patterns::{PatternV1, SkeletonV1, SkeletonsV1};
+        use icu_datetime::pattern::reference::GenericPattern;
         use litemap::LiteMap;
 
         // TODO(#308): Support numbering system variations. We currently throw them away.
         Self {
-            length_patterns: gregory::patterns::LengthPatternsV1 {
-                full: Cow::Owned(other.full.get_pattern().clone()),
-                long: Cow::Owned(other.long.get_pattern().clone()),
-                medium: Cow::Owned(other.medium.get_pattern().clone()),
-                short: Cow::Owned(other.short.get_pattern().clone()),
+            length_patterns: gregory::patterns::GenericLengthPatternsV1 {
+                full: GenericPattern::from_bytes(other.full.get_pattern())
+                    .unwrap()
+                    .into(),
+                long: GenericPattern::from_bytes(other.long.get_pattern())
+                    .unwrap()
+                    .into(),
+                medium: GenericPattern::from_bytes(other.medium.get_pattern())
+                    .unwrap()
+                    .into(),
+                short: GenericPattern::from_bytes(other.short.get_pattern())
+                    .unwrap()
+                    .into(),
             },
             skeletons: {
                 let mut skeletons = SkeletonsV1(LiteMap::new());
@@ -179,7 +190,7 @@ impl From<&cldr_json::DateTimeFormats> for gregory::patterns::DateTimeFormatsV1 
     }
 }
 
-impl From<&cldr_json::Dates> for gregory::DatePatternsV1 {
+impl From<&cldr_json::Dates> for gregory::DatePatternsV1<'_> {
     fn from(other: &cldr_json::Dates) -> Self {
         let date_time_formats_v1 =
             gregory::patterns::DateTimeFormatsV1::from(&other.calendars.gregorian.datetime_formats);
@@ -192,13 +203,17 @@ impl From<&cldr_json::Dates> for gregory::DatePatternsV1 {
         use pattern::reference::Pattern;
 
         let pattern_full = Pattern::from_bytes(pattern_str_full)
-            .expect("Failed to create a full Pattern from bytes.");
+            .expect("Failed to create a full Pattern from bytes.")
+            .into();
         let pattern_long = Pattern::from_bytes(pattern_str_long)
-            .expect("Failed to create a long Pattern from bytes.");
+            .expect("Failed to create a long Pattern from bytes.")
+            .into();
         let pattern_medium = Pattern::from_bytes(pattern_str_medium)
-            .expect("Failed to create a medium Pattern from bytes.");
+            .expect("Failed to create a medium Pattern from bytes.")
+            .into();
         let pattern_short = Pattern::from_bytes(pattern_str_short)
-            .expect("Failed to create a short Pattern from bytes.");
+            .expect("Failed to create a short Pattern from bytes.")
+            .into();
 
         let mut preferred_hour_cycle: Option<CoarseHourCycle> = None;
         let arr = [
@@ -231,19 +246,19 @@ impl From<&cldr_json::Dates> for gregory::DatePatternsV1 {
             let time = (&other.calendars.gregorian.time_formats).into();
             let alt_time = gregory::patterns::LengthPatternsV1 {
                 full: alt_hour_cycle
-                    .apply_on_pattern(&date_time_formats_v1, pattern_str_full, pattern_full)
+                    .apply_on_pattern(&pattern_full, &date_time_formats_v1)
                     .expect("Failed to apply a coarse hour cycle to a full pattern.")
                     .into(),
                 long: alt_hour_cycle
-                    .apply_on_pattern(&date_time_formats_v1, pattern_str_long, pattern_long)
+                    .apply_on_pattern(&pattern_long, &date_time_formats_v1)
                     .expect("Failed to apply a coarse hour cycle to a long pattern.")
                     .into(),
                 medium: alt_hour_cycle
-                    .apply_on_pattern(&date_time_formats_v1, pattern_str_medium, pattern_medium)
+                    .apply_on_pattern(&pattern_medium, &date_time_formats_v1)
                     .expect("Failed to apply a coarse hour cycle to a medium pattern.")
                     .into(),
                 short: alt_hour_cycle
-                    .apply_on_pattern(&date_time_formats_v1, pattern_str_short, pattern_short)
+                    .apply_on_pattern(&pattern_short, &date_time_formats_v1)
                     .expect("Failed to apply a coarse hour cycle to a short pattern.")
                     .into(),
             };
