@@ -89,7 +89,8 @@ where
 // TODO(#622) Make TimeZoneFormat public once we have a clean way to provide it options.
 pub(super) struct TimeZoneFormat<'data> {
     /// The pattern to format.
-    pub(super) pattern: Pattern,
+    pub(super) pattern:
+        DataPayload<'data, provider::gregory::patterns::PatternFromPatternsV1Marker>,
     /// The data that contains meta information about how to display content.
     pub(super) zone_formats: DataPayload<'data, provider::time_zones::TimeZoneFormatsV1Marker>,
     /// The exemplar cities for time zones.
@@ -134,7 +135,7 @@ impl<'data> TimeZoneFormat<'data> {
     // TODO(#622) Make this public once TimeZoneFormat is public.
     pub(super) fn try_new<L, ZP>(
         locale: L,
-        pattern: Pattern,
+        pattern: DataPayload<'data, provider::gregory::patterns::PatternFromPatternsV1Marker>,
         zone_provider: &ZP,
     ) -> Result<Self, DateTimeFormatError>
     where
@@ -173,6 +174,8 @@ impl<'data> TimeZoneFormat<'data> {
 
         let zone_symbols = time_zone_format
             .pattern
+            .get()
+            .0
             .items
             .iter()
             .filter_map(|item| match item {

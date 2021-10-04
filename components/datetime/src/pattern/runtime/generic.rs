@@ -8,10 +8,25 @@ use super::{
     Pattern,
 };
 use alloc::vec::Vec;
+use icu_provider::yoke::{self, Yokeable, ZeroCopyFrom};
 use zerovec::{ule::AsULE, ZeroVec};
 
+#[derive(Debug, PartialEq, Clone, Yokeable, ZeroCopyFrom)]
+#[cfg_attr(
+    feature = "provider_serde",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct GenericPattern<'data> {
+    #[cfg_attr(feature = "provider_serde", serde(borrow))]
     pub items: ZeroVec<'data, GenericPatternItem>,
+}
+
+impl Default for GenericPattern<'_> {
+    fn default() -> Self {
+        Self {
+            items: ZeroVec::clone_from_slice(&[]),
+        }
+    }
 }
 
 impl<'data> GenericPattern<'data> {
@@ -43,19 +58,26 @@ impl<'data> GenericPattern<'data> {
     ///     "Y-m-d 'at' HH:mm"
     /// );
     /// ```
-    pub fn combined(self, replacements: Vec<Pattern>) -> Result<Pattern, PatternError> {
-        let size = replacements.iter().fold(0, |acc, r| acc + r.items.len());
+    pub fn combined(
+        self,
+        date: &Pattern<'data>,
+        time: &Pattern<'data>,
+    ) -> Result<Pattern<'data>, PatternError> {
+        let size = date.items.len() + time.items.len();
         let mut result = Vec::with_capacity(self.items.len() + size);
 
         for item in self.items.iter() {
             match item {
+                GenericPatternItem::Placeholder(1) => {
+                    result.extend(date.items.iter());
+                }
+                GenericPatternItem::Placeholder(0) => {
+                    result.extend(time.items.iter());
+                }
                 GenericPatternItem::Placeholder(idx) => {
-                    let replacement = replacements.get(idx as usize).ok_or_else(|| {
-                        let idx = char::from_digit(idx as u32, 10)
-                            .expect("Failed to convert placeholder idx to char");
-                        PatternError::UnknownSubstitution(idx)
-                    })?;
-                    result.extend(replacement.items.iter());
+                    let idx = char::from_digit(idx as u32, 10)
+                        .expect("Failed to convert placeholder idx to char");
+                    return Err(PatternError::UnknownSubstitution(idx));
                 }
                 GenericPatternItem::Literal(ch) => result.push(PatternItem::Literal(ch)),
             }
@@ -79,7 +101,7 @@ mod test {
 
     #[test]
     fn test_runtime_generic_pattern_combine() {
-        let pattern = reference::GenericPattern::from_bytes("{0} 'at' {1}")
+        let pattern = reference::GenericPattern::from_bytes("{1} 'at' {0}")
             .expect("Failed to parse a generic pattern.");
         let pattern: runtime::GenericPattern = pattern.into();
 
@@ -92,7 +114,7 @@ mod test {
         let time: runtime::Pattern = time.into();
 
         let pattern = pattern
-            .combined(vec![date, time])
+            .combined(&date, &time)
             .expect("Failed to combine date and time.");
         let pattern = reference::Pattern::from(pattern.items.to_vec());
 

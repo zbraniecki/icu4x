@@ -8,7 +8,10 @@
 use crate::{
     format::datetime,
     options::DateTimeFormatOptions,
-    provider::gregory::{DatePatternsV1Marker, DateSkeletonPatternsV1Marker, DateSymbolsV1Marker},
+    provider::gregory::{
+        patterns::PatternFromPatternsV1Marker, DatePatternsV1Marker, DateSkeletonPatternsV1Marker,
+        DateSymbolsV1Marker,
+    },
 };
 use alloc::string::String;
 use icu_locid::Locale;
@@ -61,7 +64,7 @@ use crate::{
 /// when we introduce asynchronous [`DataProvider`] and corresponding asynchronous constructor.
 pub struct DateTimeFormat<'data> {
     pub(super) locale: Locale,
-    pub(super) pattern: Pattern,
+    pub(super) pattern: DataPayload<'data, PatternFromPatternsV1Marker>,
     pub(super) symbols: Option<DataPayload<'data, DateSymbolsV1Marker>>,
 }
 
@@ -99,10 +102,9 @@ impl<'data> DateTimeFormat<'data> {
     {
         let locale = locale.into();
 
-        let pattern = provider::date_time::pattern_for_options(data_provider, &locale, options)?
-            .unwrap_or_default();
+        let pattern = provider::date_time::pattern_for_options(data_provider, &locale, options)?;
 
-        let requires_data = datetime::analyze_pattern(&pattern, false)
+        let requires_data = datetime::analyze_pattern(&pattern.get().0, false)
             .map_err(|field| DateTimeFormatError::UnsupportedField(field.symbol))?;
 
         let symbols_data = if requires_data {
@@ -141,7 +143,7 @@ impl<'data> DateTimeFormat<'data> {
     /// [`ZonedDateTimeFormat`]: crate::zoned_datetime::ZonedDateTimeFormat
     pub(super) fn new<T: Into<Locale>>(
         locale: T,
-        pattern: Pattern,
+        pattern: DataPayload<'data, PatternFromPatternsV1Marker>,
         symbols: Option<DataPayload<'data, DateSymbolsV1Marker>>,
     ) -> Self {
         let locale = locale.into();
@@ -181,7 +183,7 @@ impl<'data> DateTimeFormat<'data> {
     /// At the moment, there's little value in using that over one of the other `format` methods,
     /// but [`FormattedDateTime`] will grow with methods for iterating over fields, extracting information
     /// about formatted date and so on.
-    pub fn format<'l, T>(&'l self, value: &'l T) -> FormattedDateTime<'l, T>
+    pub fn format<'l: 'data, T>(&'l self, value: &'l T) -> FormattedDateTime<'l, T>
     where
         T: DateTimeInput,
     {
@@ -225,7 +227,7 @@ impl<'data> DateTimeFormat<'data> {
         value: &impl DateTimeInput,
     ) -> core::fmt::Result {
         datetime::write_pattern(
-            &self.pattern,
+            &self.pattern.get().0,
             self.symbols.as_ref().map(|s| s.get()),
             value,
             &self.locale,

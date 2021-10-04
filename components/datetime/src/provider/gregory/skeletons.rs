@@ -8,6 +8,7 @@ use super::patterns::PatternV1;
 use crate::skeleton::{Skeleton, SkeletonError};
 use core::convert::TryFrom;
 use icu_provider::yoke::{self, *};
+use icu_provider::DataMarker;
 use litemap::LiteMap;
 
 #[icu_provider::data_struct]
@@ -17,7 +18,9 @@ use litemap::LiteMap;
     derive(serde::Serialize, serde::Deserialize)
 )]
 #[yoke(cloning_zcf)]
-pub struct DateSkeletonPatternsV1(pub LiteMap<SkeletonV1, PatternV1>);
+pub struct DateSkeletonPatternsV1<'data>(
+    #[cfg_attr(feature = "provider_serde", serde(borrow))] pub LiteMap<Skeleton, PatternV1<'data>>,
+);
 
 /// This struct is a public wrapper around the internal `Skeleton` struct. This allows
 /// access to the serialization and deserialization capabilities, without exposing the
@@ -41,4 +44,13 @@ impl TryFrom<&str> for SkeletonV1 {
             Err(err) => Err(err),
         }
     }
+}
+
+/// Helper struct used to allow for projection of `DataPayload<DateSkeletonPatternsV1>` to
+/// `DataPayload<PatternV1>`.
+pub struct PatternFromSkeletonsV1Marker;
+
+impl<'data> DataMarker<'data> for PatternFromSkeletonsV1Marker {
+    type Yokeable = PatternV1<'static>;
+    type Cart = DateSkeletonPatternsV1<'data>;
 }

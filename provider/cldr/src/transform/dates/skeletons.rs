@@ -105,10 +105,12 @@ impl<'data> IterableDataProviderCore for DateSkeletonPatternsProvider<'data> {
     }
 }
 
-impl From<&cldr_json::DateTimeFormats> for gregory::DateSkeletonPatternsV1 {
+impl From<&cldr_json::DateTimeFormats> for gregory::DateSkeletonPatternsV1<'_> {
     fn from(other: &cldr_json::DateTimeFormats) -> Self {
         use gregory::patterns::PatternV1;
         use gregory::SkeletonV1;
+        use icu_datetime::pattern::reference::Pattern;
+        use icu_datetime::skeleton::Skeleton;
         use litemap::LiteMap;
 
         let mut skeletons = LiteMap::new();
@@ -130,7 +132,7 @@ impl From<&cldr_json::DateTimeFormats> for gregory::DateSkeletonPatternsV1 {
 
             let unique_skeleton = unique_skeleton.expect("Expected to find a skeleton.");
 
-            let skeleton_fields_v1 = match SkeletonV1::try_from(unique_skeleton) {
+            let skeleton_fields_v1 = match Skeleton::try_from(unique_skeleton) {
                 Ok(s) => s,
                 Err(err) => match err {
                     // Ignore unimplemented fields for now.
@@ -147,10 +149,12 @@ impl From<&cldr_json::DateTimeFormats> for gregory::DateSkeletonPatternsV1 {
                 continue;
             }
 
-            let pattern_v1 =
-                PatternV1::try_from(pattern_str as &str).expect("Unable to parse a pattern");
+            let pattern_v1: icu_datetime::pattern::runtime::Pattern =
+                Pattern::from_bytes(pattern_str)
+                    .expect("Unable to parse a pattern")
+                    .into();
 
-            skeletons.insert(skeleton_fields_v1, pattern_v1);
+            skeletons.insert(skeleton_fields_v1, pattern_v1.into());
         }
 
         // TODO(#308): Support numbering system variations. We currently throw them away.

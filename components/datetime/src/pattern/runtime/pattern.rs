@@ -7,9 +7,10 @@ use crate::pattern::reference::pattern::dump_buffer_into_formatter;
 use alloc::fmt::{self, Write};
 use alloc::string::String;
 use alloc::{vec, vec::Vec};
+use icu_provider::yoke::{self, Yokeable, ZeroCopyFrom};
 use zerovec::ZeroVec;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Yokeable, ZeroCopyFrom)]
 #[cfg_attr(
     feature = "provider_serde",
     derive(serde::Serialize, serde::Deserialize)
@@ -18,6 +19,15 @@ pub struct Pattern<'data> {
     #[cfg_attr(feature = "provider_serde", serde(borrow))]
     pub items: ZeroVec<'data, PatternItem>,
     pub(crate) time_granularity: TimeGranularity,
+}
+
+impl<'data> Pattern<'data> {
+    pub fn into_owned(self) -> Pattern<'static> {
+        Pattern {
+            items: self.items.into_owned(),
+            time_granularity: self.time_granularity,
+        }
+    }
 }
 
 impl From<Vec<PatternItem>> for Pattern<'_> {

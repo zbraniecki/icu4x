@@ -41,31 +41,33 @@ fn print(_input: &str, _value: Option<usize>) {
 fn main(_argc: isize, _argv: *const *const u8) -> isize {
     icu_benchmark_macros::main_setup!();
 
-    let locale: Locale = langid!("en").into();
-
-    let provider = icu_testdata::get_provider();
-
     let dates = DATES_ISO
         .iter()
         .copied()
         .map(parse_gregorian_from_str)
         .collect::<Result<Vec<DateTime<Gregorian>>, _>>()
         .expect("Failed to parse dates.");
+    // let provider = icu_testdata::get_provider();
+    let provider = icu_testdata::get_static_provider();
 
-    let options = length::Bag {
-        date: Some(length::Date::Medium),
-        time: Some(length::Time::Short),
-        ..Default::default()
-    };
+    for i in 0..10000 {
+        let locale: Locale = langid!("en").into();
 
-    let dtf = DateTimeFormat::try_new(locale, &provider, &options.into())
-        .expect("Failed to create DateTimeFormat instance.");
-    {
-        print("\n====== Work Log (en) example ============", None);
+        let options = length::Bag {
+            date: Some(length::Date::Medium),
+            time: Some(length::Time::Short),
+            ..Default::default()
+        };
 
-        for (idx, date) in dates.iter().enumerate() {
-            let fdt = dtf.format(date);
-            println!("{}) {}", idx, fdt);
+        let dtf = DateTimeFormat::try_new(locale, &provider, &options.into())
+            .expect("Failed to create DateTimeFormat instance.");
+        {
+            // print("\n====== Work Log (en) example ============", None);
+
+            for (idx, date) in dates.iter().enumerate() {
+                let fdt = dtf.format(date);
+                // println!("{}) {}", idx, fdt);
+            }
         }
     }
 

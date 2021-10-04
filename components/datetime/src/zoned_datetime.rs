@@ -116,10 +116,9 @@ impl<'data> ZonedDateTimeFormat<'data> {
     {
         let locale = locale.into();
 
-        let pattern = provider::date_time::pattern_for_options(date_provider, &locale, options)?
-            .unwrap_or_default();
+        let pattern = provider::date_time::pattern_for_options(date_provider, &locale, options)?;
 
-        let requires_data = datetime::analyze_pattern(&pattern, true)
+        let requires_data = datetime::analyze_pattern(&pattern.get().0, true)
             .map_err(|field| DateTimeFormatError::UnsupportedField(field.symbol))?;
 
         let symbols_data = if requires_data {

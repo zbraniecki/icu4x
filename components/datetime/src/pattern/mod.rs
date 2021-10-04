@@ -11,11 +11,12 @@ pub mod runtime;
 use crate::fields;
 pub use error::PatternError;
 pub use hour_cycle::CoarseHourCycle;
+use icu_provider::yoke::{self, Yokeable, ZeroCopyFrom};
 pub use item::{GenericPatternItem, PatternItem};
 
 /// The granularity of time represented in a pattern item.
 /// Ordered from least granular to most granular for comparsion.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Yokeable, ZeroCopyFrom)]
 #[cfg_attr(
     feature = "provider_serde",
     derive(serde::Serialize, serde::Deserialize)

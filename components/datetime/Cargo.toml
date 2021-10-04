@@ -83,3 +83,9 @@ required-features = ["provider_serde"]
 [[example]]
 name = "work_log"
 required-features = ["provider_serde"]
+
+[profile.release]
+debug = true
+
+[profile.bench]
+debug = true

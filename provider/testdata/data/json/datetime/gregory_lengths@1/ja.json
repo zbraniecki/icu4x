@@ -1,27 +1,484 @@
 {
   "date": {
-    "full": "y年M月d日EEEE",
-    "long": "y年M月d日",
-    "medium": "y/MM/dd",
-    "short": "y/MM/dd"
+    "full": {
+      "items": [
+        {
+          "Field": {
+            "symbol": {
+              "Year": "Calendar"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": "年"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Month": "Format"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": "月"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Day": "DayOfMonth"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": "日"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Weekday": "Format"
+            },
+            "length": "Wide"
+          }
+        }
+      ],
+      "time_granularity": "None"
+    },
+    "long": {
+      "items": [
+        {
+          "Field": {
+            "symbol": {
+              "Year": "Calendar"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": "年"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Month": "Format"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": "月"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Day": "DayOfMonth"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": "日"
+        }
+      ],
+      "time_granularity": "None"
+    },
+    "medium": {
+      "items": [
+        {
+          "Field": {
+            "symbol": {
+              "Year": "Calendar"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": "/"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Month": "Format"
+            },
+            "length": "TwoDigit"
+          }
+        },
+        {
+          "Literal": "/"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Day": "DayOfMonth"
+            },
+            "length": "TwoDigit"
+          }
+        }
+      ],
+      "time_granularity": "None"
+    },
+    "short": {
+      "items": [
+        {
+          "Field": {
+            "symbol": {
+              "Year": "Calendar"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": "/"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Month": "Format"
+            },
+            "length": "TwoDigit"
+          }
+        },
+        {
+          "Literal": "/"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Day": "DayOfMonth"
+            },
+            "length": "TwoDigit"
+          }
+        }
+      ],
+      "time_granularity": "None"
+    }
   },
   "time_h11_h12": {
-    "full": "aK:mm:ss",
-    "long": "aK:mm:ss",
-    "medium": "aK:mm:ss",
-    "short": "aK:mm"
+    "full": {
+      "items": [
+        {
+          "Field": {
+            "symbol": {
+              "Hour": "H23"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": ":"
+        },
+        {
+          "Field": {
+            "symbol": "Minute",
+            "length": "TwoDigit"
+          }
+        },
+        {
+          "Literal": ":"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Second": "Second"
+            },
+            "length": "TwoDigit"
+          }
+        }
+      ],
+      "time_granularity": "Seconds"
+    },
+    "long": {
+      "items": [
+        {
+          "Field": {
+            "symbol": {
+              "Hour": "H23"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": ":"
+        },
+        {
+          "Field": {
+            "symbol": "Minute",
+            "length": "TwoDigit"
+          }
+        },
+        {
+          "Literal": ":"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Second": "Second"
+            },
+            "length": "TwoDigit"
+          }
+        }
+      ],
+      "time_granularity": "Seconds"
+    },
+    "medium": {
+      "items": [
+        {
+          "Field": {
+            "symbol": {
+              "Hour": "H23"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": ":"
+        },
+        {
+          "Field": {
+            "symbol": "Minute",
+            "length": "TwoDigit"
+          }
+        },
+        {
+          "Literal": ":"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Second": "Second"
+            },
+            "length": "TwoDigit"
+          }
+        }
+      ],
+      "time_granularity": "Seconds"
+    },
+    "short": {
+      "items": [
+        {
+          "Field": {
+            "symbol": {
+              "Hour": "H23"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": ":"
+        },
+        {
+          "Field": {
+            "symbol": "Minute",
+            "length": "TwoDigit"
+          }
+        }
+      ],
+      "time_granularity": "Minutes"
+    }
   },
   "time_h23_h24": {
-    "full": "H時mm分ss秒 zzzz",
-    "long": "H:mm:ss z",
-    "medium": "H:mm:ss",
-    "short": "H:mm"
+    "full": {
+      "items": [
+        {
+          "Field": {
+            "symbol": {
+              "Hour": "H23"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": "時"
+        },
+        {
+          "Field": {
+            "symbol": "Minute",
+            "length": "TwoDigit"
+          }
+        },
+        {
+          "Literal": "分"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Second": "Second"
+            },
+            "length": "TwoDigit"
+          }
+        },
+        {
+          "Literal": "秒"
+        },
+        {
+          "Literal": " "
+        },
+        {
+          "Field": {
+            "symbol": {
+              "TimeZone": "LowerZ"
+            },
+            "length": "Wide"
+          }
+        }
+      ],
+      "time_granularity": "Seconds"
+    },
+    "long": {
+      "items": [
+        {
+          "Field": {
+            "symbol": {
+              "Hour": "H23"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": ":"
+        },
+        {
+          "Field": {
+            "symbol": "Minute",
+            "length": "TwoDigit"
+          }
+        },
+        {
+          "Literal": ":"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Second": "Second"
+            },
+            "length": "TwoDigit"
+          }
+        },
+        {
+          "Literal": " "
+        },
+        {
+          "Field": {
+            "symbol": {
+              "TimeZone": "LowerZ"
+            },
+            "length": "One"
+          }
+        }
+      ],
+      "time_granularity": "Seconds"
+    },
+    "medium": {
+      "items": [
+        {
+          "Field": {
+            "symbol": {
+              "Hour": "H23"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": ":"
+        },
+        {
+          "Field": {
+            "symbol": "Minute",
+            "length": "TwoDigit"
+          }
+        },
+        {
+          "Literal": ":"
+        },
+        {
+          "Field": {
+            "symbol": {
+              "Second": "Second"
+            },
+            "length": "TwoDigit"
+          }
+        }
+      ],
+      "time_granularity": "Seconds"
+    },
+    "short": {
+      "items": [
+        {
+          "Field": {
+            "symbol": {
+              "Hour": "H23"
+            },
+            "length": "One"
+          }
+        },
+        {
+          "Literal": ":"
+        },
+        {
+          "Field": {
+            "symbol": "Minute",
+            "length": "TwoDigit"
+          }
+        }
+      ],
+      "time_granularity": "Minutes"
+    }
   },
   "preferred_hour_cycle": "H23H24",
   "length_combinations": {
-    "full": "{1} {0}",
-    "long": "{1} {0}",
-    "medium": "{1} {0}",
-    "short": "{1} {0}"
+    "full": {
+      "items": [
+        {
+          "Placeholder": 1
+        },
+        {
+          "Literal": " "
+        },
+        {
+          "Placeholder": 0
+        }
+      ]
+    },
+    "long": {
+      "items": [
+        {
+          "Placeholder": 1
+        },
+        {
+          "Literal": " "
+        },
+        {
+          "Placeholder": 0
+        }
+      ]
+    },
+    "medium": {
+      "items": [
+        {
+          "Placeholder": 1
+        },
+        {
+          "Literal": " "
+        },
+        {
+          "Placeholder": 0
+        }
+      ]
+    },
+    "short": {
+      "items": [
+        {
+          "Placeholder": 1
+        },
+        {
+          "Literal": " "
+        },
+        {
+          "Placeholder": 0
+        }
+      ]
+    }
   }
 }
