@@ -32,6 +32,7 @@ denylist = ["bench"]
 all-features = true
 
 [dependencies]
+libm = "0.2"
 fixed_decimal = { version = "0.2", path = "../../utils/fixed_decimal" }
 icu_provider = { version = "0.4", path = "../../provider/core", features = ["macros"] }
 icu_locid = { version = "0.4", path = "../locid" }

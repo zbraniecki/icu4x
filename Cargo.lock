@@ -1223,6 +1223,7 @@ dependencies = [
  "icu_locid_macros",
  "icu_provider",
  "icu_testdata",
+ "libm",
  "serde",
  "serde_json",
  "zerovec",
