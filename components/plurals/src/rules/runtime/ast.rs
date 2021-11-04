@@ -44,7 +44,7 @@ pub enum Operand {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum RangeOrValue {
-    Range(u32, u32), // XXX: Can we get away from smaller?
+    Range(u32, u32),
     Value(u32),
 }
 
@@ -358,8 +358,8 @@ unsafe impl VarULE for RelationULE {
     unsafe fn from_byte_slice_unchecked(bytes: &[u8]) -> &Self {
         let ptr = bytes.as_ptr();
         let len = bytes.len();
-        // subtract length of andor_polarity_operand and modulo and then convert between a slice of bytes and PlainOldULE<8>
-        let len_new = (len - 5) / 8;
+        // subtract length of andor_polarity_operand and modulo and then convert between a slice of bytes and PlainOldULE<4>
+        let len_new = (len - 5) / 4;
         // it's hard constructing custom DSTs, we fake a pointer/length construction
         // eventually we can use the Pointer::Metadata APIs when they stabilize
         let fake_slice = core::ptr::slice_from_raw_parts(ptr as *const RangeOrValueULE, len_new);
@@ -402,13 +402,13 @@ unsafe impl EncodeAsVarULE<RelationULE> for Relation<'_> {
 
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
-pub struct RangeOrValueULE(PlainOldULE<8>);
+pub struct RangeOrValueULE(PlainOldULE<4>);
 
 unsafe impl ULE for RangeOrValueULE {
     type Error = zerovec::ule::ULEError<core::convert::Infallible>;
 
     fn validate_byte_slice(bytes: &[u8]) -> Result<(), Self::Error> {
-        PlainOldULE::<8>::validate_byte_slice(bytes)
+        PlainOldULE::<4>::validate_byte_slice(bytes)
     }
 }
 
@@ -417,19 +417,19 @@ impl AsULE for RangeOrValue {
 
     #[inline]
     fn as_unaligned(self) -> Self::ULE {
-        let mut result = [0; 8];
+        let mut result = [0; 4];
         match self {
             Self::Range(start, end) => {
-                let start_bytes = start.to_be_bytes();
-                let end_bytes = end.to_be_bytes();
-                result[..4].copy_from_slice(&start_bytes);
-                result[4..].copy_from_slice(&end_bytes);
+                let start_bytes = (start as u16).to_be_bytes();
+                let end_bytes = (end as u16).to_be_bytes();
+                result[..2].copy_from_slice(&start_bytes);
+                result[2..].copy_from_slice(&end_bytes);
                 RangeOrValueULE(result.into())
             }
             Self::Value(idx) => {
-                let bytes = idx.to_be_bytes();
-                result[..4].copy_from_slice(&bytes);
-                result[4..].copy_from_slice(&bytes);
+                let bytes = (idx as u16).to_be_bytes();
+                result[..2].copy_from_slice(&bytes);
+                result[2..].copy_from_slice(&bytes);
                 RangeOrValueULE(result.into())
             }
         }
@@ -438,8 +438,8 @@ impl AsULE for RangeOrValue {
     #[inline]
     fn from_unaligned(unaligned: Self::ULE) -> Self {
         let b = unaligned.0 .0;
-        let start = u32::from_be_bytes([b[0], b[1], b[2], b[3]]);
-        let end = u32::from_be_bytes([b[4], b[5], b[6], b[7]]);
+        let start = u16::from_be_bytes([b[0], b[1]]) as u32;
+        let end = u16::from_be_bytes([b[2], b[3]]) as u32;
         if start == end {
             Self::Value(start)
         } else {
@@ -605,12 +605,12 @@ mod test {
     fn range_or_value_ule_test() {
         let rov = RangeOrValue::Value(1);
         let ule = rov.as_unaligned().0;
-        let ref_bytes = &[0, 0, 0, 1, 0, 0, 0, 1];
+        let ref_bytes = &[0, 1, 0, 1];
         assert_eq!(ULE::as_byte_slice(&[ule]), *ref_bytes);
 
         let rov = RangeOrValue::Range(2, 4);
         let ule = rov.as_unaligned().0;
-        let ref_bytes = &[0, 0, 0, 2, 0, 0, 0, 4];
+        let ref_bytes = &[0, 2, 0, 4];
         assert_eq!(ULE::as_byte_slice(&[ule]), *ref_bytes);
     }
 
@@ -628,7 +628,17 @@ mod test {
         let vzv = VarZeroVec::from(relations.as_slice());
         assert_eq!(
             vzv.get_encoded_slice(),
-            &[1, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1]
+            &[1, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 1, 0, 1]
         );
+    }
+
+    #[test]
+    fn runtime_ast_memory_test() {
+        // enum Foo {
+        //     V1(u16, u16),
+        //     V2(u32),
+        // }
+        // assert_eq!(core::mem::size_of::<Foo>(), 2);
+        // assert_eq!(core::mem::size_of::<RangeOrValue>(), 64);
     }
 }
