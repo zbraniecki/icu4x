@@ -1426,6 +1426,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "icu_preferences"
+version = "0.0.1"
+dependencies = [
+ "icu_datetime",
+ "icu_locid",
+]
+
+[[package]]
 name = "icu_properties"
 version = "0.6.0"
 dependencies = [
