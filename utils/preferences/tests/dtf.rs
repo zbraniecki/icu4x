@@ -2,8 +2,8 @@ use icu_datetime::options::preferences::HourCycle;
 use icu_locid::{unicode_ext_key, Locale};
 use icu_preferences::preferences;
 
-#[derive(Clone, Copy)]
-enum Calendar {
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum Calendar {
     Gregory,
 }
 
@@ -19,8 +19,8 @@ preferences!(
     DTFPreferences,
     ResolvedDTFPreferences,
     {
-        hour_cycle => Option<HourCycle>, HourCycle, Some(unicode_ext_key!("hc")),
-        calendar => Option<Calendar>, Calendar, Some(unicode_ext_key!("ca"))
+        hour_cycle, hourCycle => Option<HourCycle>, HourCycle, Some(unicode_ext_key!("hc")),
+        calendar, calendar => Option<Calendar>, Calendar, Some(unicode_ext_key!("ca"))
     }
 );
 

@@ -23,31 +23,31 @@
 //! let prefs = preferences::Bag::from_hour_cycle(preferences::HourCycle::H23);
 //! ```
 use crate::fields;
-use icu_locid::{unicode_ext_value, extensions::unicode};
+use icu_locid::{unicode_ext_key, unicode_ext_value, extensions::unicode};
+use icu_preferences::preferences;
 use core::convert::TryFrom;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// Stores user preferences which may affect the result of date and time formatting.
-///
-/// # Examples
-///
-/// ```
-/// use icu::datetime::options::preferences;
-///
-/// let prefs = preferences::Bag::from_hour_cycle(preferences::HourCycle::H23);
-/// ```
-#[derive(Debug, Clone, PartialEq, Copy)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[non_exhaustive]
-pub struct Bag {
-    /// The hour cycle can be adjusts according to user preferences, for instance at the OS-level.
-    /// That preference can be applied here to change the hour cycle from the default for the
-    /// given locale.
-    #[cfg_attr(feature = "serde", serde(rename = "hourCycle"))]
-    pub hour_cycle: Option<HourCycle>,
-}
+preferences!(
+    Bag,
+    ResolvedBag,
+    {
+        hour_cycle, "hourCycle" => Option<HourCycle>, HourCycle, Some(unicode_ext_key!("hc"))
+    }
+);
+
+// #[derive(Debug, Clone, PartialEq, Copy)]
+// #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+// #[non_exhaustive]
+// pub struct Bag {
+//     /// The hour cycle can be adjusts according to user preferences, for instance at the OS-level.
+//     /// That preference can be applied here to change the hour cycle from the default for the
+//     /// given locale.
+//     #[cfg_attr(feature = "serde", serde(rename = "hourCycle"))]
+//     pub hour_cycle: Option<HourCycle>,
+// }
 
 impl Bag {
     /// Construct a [`Bag`] with a given [`HourCycle`]

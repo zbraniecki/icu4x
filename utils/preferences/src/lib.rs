@@ -11,7 +11,7 @@ mod tests {
         Preferences,
         ResolvedPreferences,
         {
-            hour_cycle => Option<HourCycle>, HourCycle, Some(unicode_ext_key!("hc"))
+            hour_cycle, hourCycle => Option<HourCycle>, HourCycle, Some(unicode_ext_key!("hc"))
         }
     );
 

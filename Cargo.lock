@@ -1304,6 +1304,7 @@ dependencies = [
  "icu_calendar",
  "icu_locid",
  "icu_plurals",
+ "icu_preferences",
  "icu_provider",
  "icu_provider_adapters",
  "icu_testdata",
@@ -1427,7 +1428,7 @@ dependencies = [
 
 [[package]]
 name = "icu_preferences"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "icu_datetime",
  "icu_locid",

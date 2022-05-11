@@ -42,6 +42,8 @@
 //! and it is strongly recommended to never write tests that expect a particular formatted output.
 
 use super::preferences;
+use icu_locid::Locale;
+use core::convert::TryFrom;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -83,6 +85,23 @@ pub struct Bag {
     /// Configure the preferences for the datetime, such as the hour cycle.
     pub preferences: Option<preferences::Bag>,
 }
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub(crate) struct ResolvedBag {
+    pub date: Option<Date>,
+    pub time: Option<Time>,
+    pub preferences: preferences::ResolvedBag,
+}
+
+// impl ResolvedBag {
+//     pub fn try_from(bag: &Bag, locale: &Locale, defaults: &preferences::ResolvedBag) -> Self {
+//         Self {
+//             date: bag.date,
+//             time: bag.time,
+//             preferences: preferences::ResolvedBag::try_from((bag, locale, defaults)).unwrap()
+//         }
+//     }
+// }
 
 impl Default for Bag {
     /// Constructs a Bag with long date and time options
