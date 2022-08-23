@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::hash::Hash;
 use std::ops::Range;
 
-pub trait Slice<'s>: Hash + PartialEq {
+pub trait Slice<'s>: Hash + PartialEq + std::fmt::Debug + Clone {
     fn from_slice<'m, S: Slice<'m>>(input: &S) -> Self
     where
         'm: 's;
