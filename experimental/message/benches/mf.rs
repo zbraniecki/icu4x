@@ -7,18 +7,19 @@ use icu_message::parser::Parser;
 use icu_message::types::VariableType;
 use icu_message::MessageFormat;
 use std::collections::HashMap;
+use icu_locid::locale;
 
 fn overview_bench(c: &mut Criterion) {
     let source = "{Hello World}";
     c.bench_function("message/format/simple/format_from_source", |b| {
-        let mf = MessageFormat::<&str>::new();
+        let mf = MessageFormat::new(locale!("en"));
         b.iter(|| {
             let _ = mf.format_from_source::<&str, &str>(black_box(source), None);
         })
     });
 
     c.bench_function("message/format/simple/format_to_string", |b| {
-        let mf = MessageFormat::<&str>::new();
+        let mf = MessageFormat::new(locale!("en"));
         let parser = Parser::new(source);
         let msg = parser.parse().unwrap();
         b.iter(|| {
@@ -31,14 +32,14 @@ fn overview_bench(c: &mut Criterion) {
     vars.insert("today".to_string(), VariableType::String("January 25 2022"));
 
     c.bench_function("message/format/placeholder/format_from_source", |b| {
-        let mf = MessageFormat::<&str>::new();
+        let mf = MessageFormat::new(locale!("en"));
         b.iter(|| {
             let _ = mf.format_from_source::<&str, _>(black_box(source), Some(&vars));
         })
     });
 
     c.bench_function("message/format/placeholder/format_to_string", |b| {
-        let mf = MessageFormat::<&str>::new();
+        let mf = MessageFormat::new(locale!("en"));
         let parser = Parser::new(source);
         let msg = parser.parse().unwrap();
         b.iter(|| {
@@ -63,7 +64,7 @@ fn compare_bench(c: &mut Criterion) {
         .collect();
 
     c.bench_function("message/format/compare/simple", |b| {
-        let mf = MessageFormat::<&str>::new();
+        let mf = MessageFormat::new(locale!("en"));
         b.iter(|| {
             for msg in &messages {
                 let _ = mf.format_to_string::<_, &str>(black_box(msg), None);
