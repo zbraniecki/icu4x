@@ -2148,6 +2148,7 @@ dependencies = [
  "criterion 0.3.6",
  "databake",
  "displaydoc",
+ "iai",
  "icu",
  "icu_collections",
  "icu_locid",
