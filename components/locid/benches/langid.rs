@@ -7,6 +7,8 @@ mod helpers;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
+use icu_locid::langid2::{Language2, LanguageIdentifier2, Region2};
+use icu_locid::subtags::{Language, Region};
 use icu_locid::LanguageIdentifier;
 
 fn langid_benches(c: &mut Criterion) {
@@ -30,7 +32,55 @@ fn langid_benches(c: &mut Criterion) {
         {
             let mut group = c.benchmark_group("langid/construct");
 
-            construct!(group, LanguageIdentifier, "langid", &data.canonicalized);
+            {
+                let languages = vec!["pl", "en", "es", "un", "de", "es", "az", "it", "ja", "zh"];
+
+                construct!(group, Language, "language", &languages);
+
+                let new_data: Vec<Vec<u8>> =
+                    languages.iter().map(|s| s.as_bytes().to_vec()).collect();
+
+                construct2_utf8!(group, Language2, "language2", &new_data);
+
+                let new_data: Vec<Vec<u16>> = languages
+                    .iter()
+                    .map(|s| s.encode_utf16().collect())
+                    .collect();
+                construct2_utf16!(group, Language2, "language2_utf16", &new_data);
+            }
+
+            {
+                let regions = vec!["PL", "US", "150", "FR", "AT", "419", "AR", "IT", "JP", "CN"];
+
+                construct!(group, Region, "region", &regions);
+
+                let new_data: Vec<Vec<u8>> =
+                    regions.iter().map(|s| s.as_bytes().to_vec()).collect();
+
+                construct2_utf8!(group, Region2, "region2", &new_data);
+
+                let new_data: Vec<Vec<u16>> =
+                    regions.iter().map(|s| s.encode_utf16().collect()).collect();
+                construct2_utf16!(group, Region2, "region2_utf16", &new_data);
+            }
+
+            {
+                let langids = vec![
+                    "pl-PL", "en-US", "es-150", "und-FR", "de-AT", "es-419", "az-AR", "it-IT",
+                    "ja-JP", "zh-CN",
+                ];
+
+                construct!(group, LanguageIdentifier, "langid", &langids);
+
+                let new_data: Vec<Vec<u8>> =
+                    langids.iter().map(|s| s.as_bytes().to_vec()).collect();
+
+                construct2_utf8!(group, LanguageIdentifier2, "langid2", &new_data);
+
+                let new_data: Vec<Vec<u16>> =
+                    langids.iter().map(|s| s.encode_utf16().collect()).collect();
+                construct2_utf16!(group, LanguageIdentifier2, "langid2_utf16", &new_data);
+            }
 
             group.finish();
         }
@@ -54,26 +104,63 @@ fn langid_benches(c: &mut Criterion) {
         {
             let mut group = c.benchmark_group("langid/compare");
 
-            let langids: Vec<LanguageIdentifier> = data
-                .canonicalized
+            // let langids: Vec<LanguageIdentifier> = data
+            //     .canonicalized
+            //     .iter()
+            //     .map(|s| s.parse().unwrap())
+            //     .collect();
+            // let langids2: Vec<LanguageIdentifier> = data
+            //     .canonicalized
+            //     .iter()
+            //     .map(|s| s.parse().unwrap())
+            //     .collect();
+
+            // compare_struct!(group, LanguageIdentifier, "langid", &langids, &langids2);
+
+            // compare_str!(
+            //     group,
+            //     LanguageIdentifier,
+            //     "langid",
+            //     &langids,
+            //     &data.canonicalized
+            // );
+
+            let samples = vec!["pl", "en", "es", "un", "de", "es", "az", "it", "ja", "zh"];
+
+            let languages: Vec<Language2> = samples
                 .iter()
-                .map(|s| s.parse().unwrap())
-                .collect();
-            let langids2: Vec<LanguageIdentifier> = data
-                .canonicalized
-                .iter()
-                .map(|s| s.parse().unwrap())
+                .map(|s| Language2::try_from(s.as_bytes()).unwrap())
                 .collect();
 
-            compare_struct!(group, LanguageIdentifier, "langid", &langids, &langids2);
+            compare_str2!(group, Language2, "language2", &languages, &samples);
 
-            compare_str!(
-                group,
-                LanguageIdentifier,
-                "langid",
-                &langids,
-                &data.canonicalized
-            );
+            let samples = vec!["PL", "US", "150", "FR", "AT", "419", "AR", "IT", "JP", "CN"];
+
+            let regions: Vec<Region2> = samples
+                .iter()
+                .map(|s| Region2::try_from(s.as_bytes()).unwrap())
+                .collect();
+
+            compare_str2!(group, Region2, "region2", &regions, &samples);
+
+            let samples = vec![
+                "pl-PL", "en-US", "es-150", "und-FR", "de-AT", "es-419", "az-AR", "it-IT", "ja-JP",
+                "zh-CN",
+            ];
+
+            let langids: Vec<LanguageIdentifier> = samples
+                .iter()
+                .map(|s| LanguageIdentifier::try_from_bytes(s.as_bytes()).unwrap())
+                .collect();
+
+            compare_str!(group, LanguageIdentifier, "langid", &langids, &samples);
+
+            let langids: Vec<LanguageIdentifier2> = samples
+                .iter()
+                .map(|s| LanguageIdentifier2::try_from(s.as_bytes()).unwrap())
+                .collect();
+
+            compare_str2!(group, LanguageIdentifier2, "langid2", &langids, &samples);
 
             group.finish();
         }

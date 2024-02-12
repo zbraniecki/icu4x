@@ -45,20 +45,42 @@ fn construct_from_bytes(c: &mut Criterion) {
         };
     }
 
+    macro_rules! cfu16 {
+        ($r:ty, $inputs:expr) => {
+            |b| {
+                let raw: Vec<Vec<u16>> = $inputs
+                    .iter()
+                    .map(|s| s.as_bytes().iter().map(|b| *b as u16).collect())
+                    .collect();
+                b.iter(move || {
+                    for u in &raw {
+                        let _ = black_box(<$r>::from_bytes_u16(u).unwrap());
+                    }
+                })
+            }
+        };
+    }
+
     let mut group4 = c.benchmark_group("construct_from_bytes/4");
     group4.bench_function("TinyAsciiStr<4>", cfu!(TinyAsciiStr<4>, STRINGS_4));
-    group4.bench_function("TinyAsciiStr<8>", cfu!(TinyAsciiStr<8>, STRINGS_4));
-    group4.bench_function("TinyAsciiStr<16>", cfu!(TinyAsciiStr<16>, STRINGS_4));
+    // group4.bench_function("TinyAsciiStr<8>", cfu!(TinyAsciiStr<8>, STRINGS_4));
+    // group4.bench_function("TinyAsciiStr<16>", cfu!(TinyAsciiStr<16>, STRINGS_4));
     group4.finish();
 
-    let mut group8 = c.benchmark_group("construct_from_bytes/8");
-    group8.bench_function("TinyAsciiStr<8>", cfu!(TinyAsciiStr<8>, STRINGS_8));
-    group8.bench_function("TinyAsciiStr<16>", cfu!(TinyAsciiStr<16>, STRINGS_8));
-    group8.finish();
+    let mut group4 = c.benchmark_group("construct_from_bytes_u16/4");
+    group4.bench_function("TinyAsciiStr<4>", cfu16!(TinyAsciiStr<4>, STRINGS_4));
+    // group4.bench_function("TinyAsciiStr<8>", cfu!(TinyAsciiStr<8>, STRINGS_4));
+    // group4.bench_function("TinyAsciiStr<16>", cfu!(TinyAsciiStr<16>, STRINGS_4));
+    group4.finish();
 
-    let mut group16 = c.benchmark_group("construct_from_bytes/16");
-    group16.bench_function("TinyAsciiStr<16>", cfu!(TinyAsciiStr<16>, STRINGS_16));
-    group16.finish();
+    // let mut group8 = c.benchmark_group("construct_from_bytes/8");
+    // group8.bench_function("TinyAsciiStr<8>", cfu!(TinyAsciiStr<8>, STRINGS_8));
+    // group8.bench_function("TinyAsciiStr<16>", cfu!(TinyAsciiStr<16>, STRINGS_8));
+    // group8.finish();
+    //
+    // let mut group16 = c.benchmark_group("construct_from_bytes/16");
+    // group16.bench_function("TinyAsciiStr<16>", cfu!(TinyAsciiStr<16>, STRINGS_16));
+    // group16.finish();
 }
 
 criterion_group!(benches, construct_from_str, construct_from_bytes,);

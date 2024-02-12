@@ -40,6 +40,32 @@ macro_rules! construct {
 }
 
 #[macro_export]
+macro_rules! construct2_utf8 {
+    ($c:expr, $struct:ident, $struct_name:expr, $data_str:expr) => {
+        $c.bench_function($struct_name, |b| {
+            b.iter(|| {
+                for s in $data_str {
+                    let _: Result<$struct, _> = $struct::try_from(black_box(s.as_slice()));
+                }
+            })
+        });
+    };
+}
+
+#[macro_export]
+macro_rules! construct2_utf16 {
+    ($c:expr, $struct:ident, $struct_name:expr, $data_str:expr) => {
+        $c.bench_function($struct_name, |b| {
+            b.iter(|| {
+                for s in $data_str {
+                    let _: Result<$struct, _> = $struct::try_from(black_box(s.as_slice()));
+                }
+            })
+        });
+    };
+}
+
+#[macro_export]
 macro_rules! to_string {
     ($c:expr, $struct:ident, $struct_name:expr, $data:expr) => {
         $c.bench_function($struct_name, |b| {
@@ -76,17 +102,37 @@ macro_rules! compare_struct {
 #[macro_export]
 macro_rules! compare_str {
     ($c:expr, $struct:ident, $struct_name:expr, $data1:expr, $data2:expr) => {
-        $c.bench_function(BenchmarkId::new("str", $struct_name), |b| {
+        $c.bench_function(BenchmarkId::new("eq_ignoring_case", $struct_name), |b| {
             b.iter(|| {
                 for (lid, s) in $data1.iter().zip($data2.iter()) {
                     let _ = black_box(lid).normalizing_eq(&black_box(s));
                 }
             })
         });
-        $c.bench_function(BenchmarkId::new("strict_cmp", $struct_name), |b| {
+        $c.bench_function(BenchmarkId::new("eq", $struct_name), |b| {
             b.iter(|| {
                 for (lid, s) in $data1.iter().zip($data2.iter()) {
-                    let _ = black_box(lid).strict_cmp(&black_box(s).as_str().as_bytes());
+                    let _ = black_box(lid).strict_cmp(&black_box(s).as_bytes());
+                }
+            })
+        });
+    };
+}
+
+#[macro_export]
+macro_rules! compare_str2 {
+    ($c:expr, $struct:ident, $struct_name:expr, $data1:expr, $data2:expr) => {
+        $c.bench_function(BenchmarkId::new("eq_ignoring_case", $struct_name), |b| {
+            b.iter(|| {
+                for (lid, s) in $data1.iter().zip($data2.iter()) {
+                    let _ = black_box(lid).eq_ignoring_case(&black_box(s.as_bytes()));
+                }
+            })
+        });
+        $c.bench_function(BenchmarkId::new("eq", $struct_name), |b| {
+            b.iter(|| {
+                for (lid, s) in $data1.iter().zip($data2.iter()) {
+                    let _ = black_box(lid).eq(black_box(s.as_bytes()));
                 }
             })
         });

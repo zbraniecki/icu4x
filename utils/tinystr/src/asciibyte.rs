@@ -142,4 +142,17 @@ impl AsciiByte {
     pub const unsafe fn to_ascii_byte_array<const N: usize>(bytes: &[u8; N]) -> [AsciiByte; N] {
         *(bytes as *const [u8; N] as *const [AsciiByte; N])
     }
+
+    #[inline]
+    pub const unsafe fn to_ascii_byte_u16_array<const N: usize>(
+        bytes: &[u16; N],
+    ) -> [AsciiByte; N] {
+        let mut result: [AsciiByte; N] = [AsciiByte::B0; N];
+        let mut i = 0;
+        while i < N {
+            result[i] = unsafe { core::mem::transmute(bytes[i] as u8) };
+            i += 1;
+        }
+        result
+    }
 }

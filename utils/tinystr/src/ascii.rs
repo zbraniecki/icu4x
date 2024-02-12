@@ -22,6 +22,10 @@ impl<const N: usize> TinyAsciiStr<N> {
         Self::from_bytes_inner(bytes, 0, bytes.len(), false)
     }
 
+    pub const fn from_bytes_u16(bytes: &[u16]) -> Result<Self, TinyStrError> {
+        Self::from_bytes_u16_inner(bytes, 0, bytes.len(), false)
+    }
+
     /// Attempts to parse a fixed-length byte array to a `TinyAsciiStr`.
     ///
     /// The byte array may contain trailing NUL bytes.
@@ -54,6 +58,97 @@ impl<const N: usize> TinyAsciiStr<N> {
         end: usize,
     ) -> Result<Self, TinyStrError> {
         Self::from_bytes_inner(bytes, start, end, false)
+    }
+
+    pub const fn from_bytes_u16_manual_slice(
+        bytes: &[u16],
+        start: usize,
+        end: usize,
+    ) -> Result<Self, TinyStrError> {
+        Self::from_bytes_u16_inner(bytes, start, end, false)
+    }
+
+    pub fn from_bytes_inner2(bytes: &[u8], len: usize) -> Result<Self, TinyStrError> {
+        let mut out: [u8; N] = [0; N];
+
+        out[..len].copy_from_slice(bytes);
+
+        Ok(Self {
+            bytes: unsafe { *(&out as *const [u8; N] as *const [AsciiByte; N]) },
+        })
+    }
+
+    pub fn from_bytes_inner2_utf16(bytes: &[u16], len: usize) -> Result<Self, TinyStrError> {
+        let mut out: [u8; N] = [0; N];
+
+        for i in 0..len {
+            out[i] = bytes[i] as u8;
+        }
+
+        Ok(Self {
+            bytes: unsafe { *(&out as *const [u8; N] as *const [AsciiByte; N]) },
+        })
+    }
+
+    pub fn from_bytes_inner2_slice(
+        bytes: &[u8],
+        start: usize,
+        end: usize,
+    ) -> Result<Self, TinyStrError> {
+        let len = end - start;
+
+        let mut out: [u8; N] = [0; N];
+
+        out[..len].copy_from_slice(&bytes[start..end]);
+
+        Ok(Self {
+            bytes: unsafe { *(&out as *const [u8; N] as *const [AsciiByte; N]) },
+        })
+    }
+
+    pub fn from_bytes_inner2_utf16_slice(
+        bytes: &[u16],
+        start: usize,
+        end: usize,
+    ) -> Result<Self, TinyStrError> {
+        let len = end - start;
+        let mut out: [u8; N] = [0; N];
+
+        for i in 0..len {
+            out[i] = bytes[start + i] as u8;
+        }
+
+        Ok(Self {
+            bytes: unsafe { *(&out as *const [u8; N] as *const [AsciiByte; N]) },
+        })
+    }
+
+    #[inline]
+    pub fn from_bytes_inner_non_const(
+        bytes: &[u8],
+        start: usize,
+        end: usize,
+    ) -> Result<Self, TinyStrError> {
+        let len = end - start;
+        if len > N {
+            return Err(TinyStrError::TooLarge { max: N, len });
+        }
+
+        let mut out = [0; N];
+        let mut i = 0;
+        // Indexing is protected by TinyStrError::TooLarge
+        #[allow(clippy::indexing_slicing)]
+        while i < len {
+            if bytes[start + i] >= 0x80 {
+                return Err(TinyStrError::NonAscii);
+            }
+            i += 1;
+        }
+        out[..len].copy_from_slice(bytes);
+
+        Ok(Self {
+            bytes: unsafe { *(&out as *const [u8; N] as *const [AsciiByte; N]) },
+        })
     }
 
     #[inline]
@@ -97,6 +192,26 @@ impl<const N: usize> TinyAsciiStr<N> {
         Ok(Self {
             // SAFETY: `out` only contains ASCII bytes and has same size as `self.bytes`
             bytes: unsafe { AsciiByte::to_ascii_byte_array(&out) },
+        })
+    }
+
+    #[inline]
+    pub(crate) const fn from_bytes_u16_inner(
+        bytes: &[u16],
+        start: usize,
+        end: usize,
+        allow_trailing_null: bool,
+    ) -> Result<Self, TinyStrError> {
+        let mut result: [AsciiByte; N] = [AsciiByte::B0; N];
+        let mut i = 0;
+        while i < end {
+            result[i] = unsafe { core::mem::transmute(bytes[i] as u8) };
+            i += 1;
+        }
+
+        Ok(Self {
+            // SAFETY: `out` only contains ASCII bytes and has same size as `self.bytes`
+            bytes: result,
         })
     }
 

@@ -92,3 +92,5 @@ mod serde;
 
 #[cfg(feature = "databake")]
 mod databake;
+
+pub mod langid2;
