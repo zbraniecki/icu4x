@@ -7,6 +7,7 @@ mod helpers;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
+use icu_locid::subtags::language2::Language2;
 use icu_locid::subtags::{Language, Region, Script, Variant};
 use icu_locid::ParserError;
 
@@ -30,6 +31,7 @@ fn subtags_bench(c: &mut Criterion) {
         .expect("Failed to read a fixture");
 
     subtag_bench!(c, "language", Language, data.language);
+    subtag_bench!(c, "language2", Language2, data.language);
     subtag_bench!(c, "script", Script, data.script);
     subtag_bench!(c, "region", Region, data.region);
     subtag_bench!(c, "variant", Variant, data.variant);

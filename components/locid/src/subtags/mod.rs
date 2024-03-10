@@ -46,6 +46,7 @@
 //!
 //! [`LanguageIdentifier`]: super::LanguageIdentifier
 mod language;
+pub mod language2;
 mod region;
 mod script;
 mod variant;

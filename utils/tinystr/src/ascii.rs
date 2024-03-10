@@ -100,6 +100,30 @@ impl<const N: usize> TinyAsciiStr<N> {
         })
     }
 
+    #[inline]
+    pub fn from_bytes_inner2(bytes: &[u8], len: usize) -> Result<Self, TinyStrError> {
+        let mut out: [u8; N] = [0; N];
+
+        out[..len].copy_from_slice(bytes);
+
+        Ok(Self {
+            bytes: unsafe { *(&out as *const [u8; N] as *const [AsciiByte; N]) },
+        })
+    }
+
+    #[inline]
+    pub fn from_bytes_inner2_utf16(bytes: &[u16], len: usize) -> Result<Self, TinyStrError> {
+        let mut out: [u8; N] = [0; N];
+
+        for i in 0..len {
+            out[i] = bytes[i] as u8;
+        }
+
+        Ok(Self {
+            bytes: unsafe { *(&out as *const [u8; N] as *const [AsciiByte; N]) },
+        })
+    }
+
     // TODO: This function shadows the FromStr trait. Rename?
     #[inline]
     pub const fn from_str(s: &str) -> Result<Self, TinyStrError> {
