@@ -45,6 +45,7 @@ pub use keywords::Keywords;
 pub use value::{value, Value};
 
 use super::ExtensionType;
+use crate::parser::subtag_iterator;
 use crate::parser::ParseError;
 use crate::parser::SubtagIterator;
 
@@ -121,11 +122,11 @@ impl Unicode {
         self.keywords.is_empty() && self.attributes.is_empty()
     }
 
-    pub(crate) fn try_from_bytes(t: &[u8]) -> Result<Self, ParseError> {
-        let mut iter = SubtagIterator::new(t);
+    pub(crate) fn try_from_utf8(t: &[u8]) -> Result<Self, ParseError> {
+        let mut iter = subtag_iterator::SubtagIterator::new(t);
 
         let ext = iter.next().ok_or(ParseError::InvalidExtension)?;
-        if let ExtensionType::Unicode = ExtensionType::try_from_byte_slice(ext)? {
+        if let ExtensionType::Unicode = ExtensionType::try_from_utf8_slice(ext)? {
             return Self::try_from_iter(&mut iter);
         }
 
@@ -164,7 +165,9 @@ impl Unicode {
         self.as_tuple().cmp(&other.as_tuple())
     }
 
-    pub(crate) fn try_from_iter(iter: &mut SubtagIterator) -> Result<Self, ParseError> {
+    pub(crate) fn try_from_iter(
+        iter: &mut subtag_iterator::SubtagIterator<'_, u8>,
+    ) -> Result<Self, ParseError> {
         let attributes = Attributes::try_from_iter(iter)?;
         let keywords = Keywords::try_from_iter(iter)?;
 
@@ -198,7 +201,7 @@ impl FromStr for Unicode {
     type Err = ParseError;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        Self::try_from_bytes(source.as_bytes())
+        Self::try_from_utf8(source.as_bytes())
     }
 }
 

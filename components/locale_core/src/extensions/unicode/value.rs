@@ -45,14 +45,14 @@ impl Value {
     /// ```
     /// use icu::locale::extensions::unicode::Value;
     ///
-    /// Value::try_from_bytes(b"buddhist").expect("Parsing failed.");
+    /// Value::try_from_utf8(b"buddhist").expect("Parsing failed.");
     /// ```
-    pub fn try_from_bytes(input: &[u8]) -> Result<Self, ParseError> {
+    pub fn try_from_utf8(input: &[u8]) -> Result<Self, ParseError> {
         let mut v = ShortBoxSlice::new();
 
         if !input.is_empty() {
             for chunk in SubtagIterator::new(input) {
-                let subtag = Subtag::try_from_bytes(chunk)?;
+                let subtag = Subtag::try_from_utf8(chunk)?;
                 if subtag != TRUE_VALUE {
                     v.push(subtag);
                 }
@@ -109,15 +109,15 @@ impl Value {
     }
 
     pub(crate) fn parse_subtag(t: &[u8]) -> Result<Option<Subtag>, ParseError> {
-        Self::parse_subtag_from_bytes_manual_slice(t, 0, t.len())
+        Self::parse_subtag_from_utf8_manual_slice(t, 0, t.len())
     }
 
-    pub(crate) const fn parse_subtag_from_bytes_manual_slice(
+    pub(crate) const fn parse_subtag_from_utf8_manual_slice(
         bytes: &[u8],
         start: usize,
         end: usize,
     ) -> Result<Option<Subtag>, ParseError> {
-        match Subtag::try_from_bytes_manual_slice(bytes, start, end) {
+        match Subtag::try_from_utf8_manual_slice(bytes, start, end) {
             Ok(TRUE_VALUE) => Ok(None),
             Ok(s) => Ok(Some(s)),
             Err(_) => Err(ParseError::InvalidSubtag),
@@ -136,7 +136,7 @@ impl FromStr for Value {
     type Err = ParseError;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        Self::try_from_bytes(source.as_bytes())
+        Self::try_from_utf8(source.as_bytes())
     }
 }
 
@@ -175,7 +175,7 @@ macro_rules! extensions_unicode_value {
         // Workaround until https://github.com/rust-lang/rust/issues/73255 lands:
         const R: $crate::extensions::unicode::Value =
             $crate::extensions::unicode::Value::from_subtag(
-                match $crate::subtags::Subtag::try_from_bytes($value.as_bytes()) {
+                match $crate::subtags::Subtag::try_from_utf8($value.as_bytes()) {
                     Ok(r) => Some(r),
                     _ => panic!(concat!("Invalid Unicode extension value: ", $value)),
                 },

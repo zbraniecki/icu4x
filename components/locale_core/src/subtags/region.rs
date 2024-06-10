@@ -52,7 +52,7 @@ impl Region {
     /// ```
     /// use icu::locale::subtags::Region;
     ///
-    /// let region = Region::try_from_bytes(b"us").expect("Parsing failed.");
+    /// let region = Region::try_from_utf8(b"us").expect("Parsing failed.");
     ///
     /// assert!(region.is_alphabetic());
     /// ```

@@ -76,7 +76,7 @@ pub struct LanguageIdentifier {
 }
 
 impl LanguageIdentifier {
-    /// A constructor which takes a utf8 slice, parses it and
+    /// A constructor which takes a UTF-8 slice, parses it and
     /// produces a well-formed [`LanguageIdentifier`].
     ///
     /// # Examples
@@ -84,9 +84,26 @@ impl LanguageIdentifier {
     /// ```
     /// use icu::locale::LanguageIdentifier;
     ///
-    /// LanguageIdentifier::try_from_bytes(b"en-US").expect("Parsing failed");
+    /// LanguageIdentifier::try_from_utf8(b"en-US").expect("Parsing failed");
     /// ```
-    pub fn try_from_bytes(v: &[u8]) -> Result<Self, ParseError> {
+    pub fn try_from_utf8(v: &[u8]) -> Result<Self, ParseError> {
+        parse_language_identifier(v, ParserMode::LanguageIdentifier)
+    }
+
+    /// A constructor which takes a UTF-16 slice, parses it and
+    /// produces a well-formed [`LanguageIdentifier`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use icu::locale::LanguageIdentifier;
+    ///
+    /// LanguageIdentifier::try_from_utf16(
+    ///   &"en-US".encode_utf16().collect::<Vec<_>>()
+    /// ).expect("Parsing failed");
+    /// ```
+    pub fn try_from_utf16(v: &[u16]) -> Result<Self, ParseError> {
+        let v: &[u8] = &v.iter().map(|s| *s as u8).collect::<alloc::vec::Vec<_>>();
         parse_language_identifier(v, ParserMode::LanguageIdentifier)
     }
 
@@ -94,7 +111,7 @@ impl LanguageIdentifier {
     #[allow(clippy::type_complexity)]
     // The return type should be `Result<Self, ParseError>` once the `const_precise_live_drops`
     // is stabilized ([rust-lang#73255](https://github.com/rust-lang/rust/issues/73255)).
-    pub const fn try_from_bytes_with_single_variant(
+    pub const fn try_from_utf8_with_single_variant(
         v: &[u8],
     ) -> Result<
         (
@@ -168,7 +185,7 @@ impl LanguageIdentifier {
     /// );
     /// ```
     pub fn canonicalize<S: AsRef<[u8]>>(input: S) -> Result<String, ParseError> {
-        let lang_id = Self::try_from_bytes(input.as_ref())?;
+        let lang_id = Self::try_from_utf8(input.as_ref())?;
         Ok(lang_id.write_to_string().into_owned())
     }
 
@@ -258,7 +275,7 @@ impl LanguageIdentifier {
             ($T:ty, $iter:ident, $expected:expr) => {
                 $iter
                     .next()
-                    .map(|b| <$T>::try_from_bytes(b) == Ok($expected))
+                    .map(|b| <$T>::try_from_utf8(b) == Ok($expected))
                     .unwrap_or(false)
             };
         }
@@ -394,7 +411,7 @@ impl FromStr for LanguageIdentifier {
     type Err = ParseError;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        Self::try_from_bytes(source.as_bytes())
+        Self::try_from_utf8(source.as_bytes())
     }
 }
 

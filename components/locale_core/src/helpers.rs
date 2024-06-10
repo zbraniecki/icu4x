@@ -33,16 +33,31 @@ macro_rules! impl_tinystr_subtag {
             /// ```
             #[doc = concat!("use icu_locale_core::", stringify!($($path::)+), stringify!($name), ";")]
             ///
-            #[doc = concat!("assert!(", stringify!($name), "::try_from_bytes(b", stringify!($good_example), ").is_ok());")]
-            #[doc = concat!("assert!(", stringify!($name), "::try_from_bytes(b", stringify!($bad_example), ").is_err());")]
+            #[doc = concat!("assert!(", stringify!($name), "::try_from_utf8(b", stringify!($good_example), ").is_ok());")]
+            #[doc = concat!("assert!(", stringify!($name), "::try_from_utf8(b", stringify!($bad_example), ").is_err());")]
             /// ```
-            pub const fn try_from_bytes(v: &[u8]) -> Result<Self, crate::parser::errors::ParseError> {
-                Self::try_from_bytes_manual_slice(v, 0, v.len())
+            pub const fn try_from_utf8(v: &[u8]) -> Result<Self, crate::parser::errors::ParseError> {
+                Self::try_from_utf8_manual_slice(v, 0, v.len())
             }
 
-            /// Equivalent to [`try_from_bytes(bytes[start..end])`](Self::try_from_bytes),
+            /// A constructor which takes a UTF-16 slice, parses it and
+            #[doc = concat!("produces a well-formed [`", stringify!($name), "`].")]
+            ///
+            /// # Examples
+            ///
+            /// ```
+            #[doc = concat!("use icu_locale_core::", stringify!($($path::)+), stringify!($name), ";")]
+            ///
+            #[doc = concat!("assert!(", stringify!($name), "::try_from_utf16(&", stringify!($good_example), ".encode_utf16().collect::<Vec<_>>()).is_ok());")]
+            #[doc = concat!("assert!(", stringify!($name), "::try_from_utf16(&", stringify!($bad_example), ".encode_utf16().collect::<Vec<_>>()).is_err());")]
+            /// ```
+            pub const fn try_from_utf16(v: &[u16]) -> Result<Self, crate::parser::errors::ParseError> {
+                Self::try_from_utf16_manual_slice(v, 0, v.len())
+            }
+
+            /// Equivalent to [`try_from_utf8(bytes[start..end])`](Self::try_from_utf8),
             /// but callable in a `const` context (which range indexing is not).
-            pub const fn try_from_bytes_manual_slice(
+            pub const fn try_from_utf8_manual_slice(
                 v: &[u8],
                 start: usize,
                 end: usize,
@@ -60,8 +75,28 @@ macro_rules! impl_tinystr_subtag {
                 }
             }
 
+            /// Equivalent to [`try_from_utf16(bytes[start..end])`](Self::try_from_utf16),
+            /// but callable in a `const` context (which range indexing is not).
+            pub const fn try_from_utf16_manual_slice(
+                v: &[u16],
+                start: usize,
+                end: usize,
+            ) -> Result<Self, crate::parser::errors::ParseError> {
+                let slen = end - start;
+
+                #[allow(clippy::double_comparisons)] // if len_start == len_end
+                if slen < $len_start || slen > $len_end {
+                    return Err(crate::parser::errors::ParseError::$error);
+                }
+
+                match tinystr::TinyAsciiStr::try_from_utf16_manual_slice(v, start, end) {
+                    Ok($tinystr_ident) if $validate => Ok(Self($normalize)),
+                    _ => Err(crate::parser::errors::ParseError::$error),
+                }
+            }
+
             #[doc = concat!("Safely creates a [`", stringify!($name), "`] from its raw format")]
-            /// as returned by [`Self::into_raw`]. Unlike [`Self::try_from_bytes`],
+            /// as returned by [`Self::into_raw`]. Unlike [`Self::try_from_utf8`],
             /// this constructor only takes normalized values.
             pub const fn try_from_raw(
                 v: [u8; $len_end],
@@ -78,7 +113,7 @@ macro_rules! impl_tinystr_subtag {
             }
 
             #[doc = concat!("Unsafely creates a [`", stringify!($name), "`] from its raw format")]
-            /// as returned by [`Self::into_raw`]. Unlike [`Self::try_from_bytes`],
+            /// as returned by [`Self::into_raw`]. Unlike [`Self::try_from_utf8`],
             /// this constructor only takes normalized values.
             ///
             /// # Safety
@@ -135,7 +170,7 @@ macro_rules! impl_tinystr_subtag {
             type Err = crate::parser::errors::ParseError;
 
             fn from_str(source: &str) -> Result<Self, Self::Err> {
-                Self::try_from_bytes(source.as_bytes())
+                Self::try_from_utf8(source.as_bytes())
             }
         }
 
@@ -192,7 +227,7 @@ macro_rules! impl_tinystr_subtag {
             ($string:literal) => {{
                 use $crate::$($path ::)+ $name;
                 const R: $name =
-                    match $name::try_from_bytes($string.as_bytes()) {
+                    match $name::try_from_utf8($string.as_bytes()) {
                         Ok(r) => r,
                         #[allow(clippy::panic)] // const context
                         _ => panic!(concat!("Invalid ", $(stringify!($path), "::",)+ stringify!($name), ": ", $string)),
@@ -214,19 +249,29 @@ macro_rules! impl_tinystr_subtag {
 
         #[test]
         fn test_construction() {
-            let maybe = $name::try_from_bytes($good_example.as_bytes());
+            let maybe = $name::try_from_utf8($good_example.as_bytes());
             assert!(maybe.is_ok());
             assert_eq!(maybe, $name::try_from_raw(maybe.unwrap().into_raw()));
             assert_eq!(maybe.unwrap().as_str(), $good_example);
+            assert_eq!(
+                $name::try_from_utf16(&$good_example.encode_utf16().collect::<Vec<_>>()),
+                maybe,
+            );
             $(
-                let maybe = $name::try_from_bytes($more_good_examples.as_bytes());
+                let maybe = $name::try_from_utf8($more_good_examples.as_bytes());
                 assert!(maybe.is_ok());
                 assert_eq!(maybe, $name::try_from_raw(maybe.unwrap().into_raw()));
                 assert_eq!(maybe.unwrap().as_str(), $more_good_examples);
+                assert_eq!(
+                    $name::try_from_utf16(&$more_good_examples.encode_utf16().collect::<Vec<_>>()),
+                    maybe,
+                );
             )*
-            assert!($name::try_from_bytes($bad_example.as_bytes()).is_err());
+            assert!($name::try_from_utf8($bad_example.as_bytes()).is_err());
+            assert!($name::try_from_utf16(&$bad_example.encode_utf16().collect::<Vec<_>>()).is_err());
             $(
-                assert!($name::try_from_bytes($more_bad_examples.as_bytes()).is_err());
+                assert!($name::try_from_utf8($more_bad_examples.as_bytes()).is_err());
+                assert!($name::try_from_utf16(&$more_bad_examples.encode_utf16().collect::<Vec<_>>()).is_err());
             )*
         }
 

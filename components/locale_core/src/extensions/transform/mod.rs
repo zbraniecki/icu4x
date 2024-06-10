@@ -43,6 +43,7 @@ pub use key::{key, Key};
 pub use value::Value;
 
 use super::ExtensionType;
+use crate::parser::subtag_iterator;
 use crate::parser::SubtagIterator;
 use crate::parser::{parse_language_identifier_from_iter, ParseError, ParserMode};
 use crate::shortvec::ShortBoxSlice;
@@ -122,11 +123,11 @@ impl Transform {
         self.lang.is_none() && self.fields.is_empty()
     }
 
-    pub(crate) fn try_from_bytes(t: &[u8]) -> Result<Self, ParseError> {
-        let mut iter = SubtagIterator::new(t);
+    pub(crate) fn try_from_utf8(t: &[u8]) -> Result<Self, ParseError> {
+        let mut iter = subtag_iterator::SubtagIterator::new(t);
 
         let ext = iter.next().ok_or(ParseError::InvalidExtension)?;
-        if let ExtensionType::Transform = ExtensionType::try_from_byte_slice(ext)? {
+        if let ExtensionType::Transform = ExtensionType::try_from_utf8_slice(ext)? {
             return Self::try_from_iter(&mut iter);
         }
 
@@ -174,12 +175,14 @@ impl Transform {
         self.as_tuple().cmp(&other.as_tuple())
     }
 
-    pub(crate) fn try_from_iter(iter: &mut SubtagIterator) -> Result<Self, ParseError> {
+    pub(crate) fn try_from_iter(
+        iter: &mut subtag_iterator::SubtagIterator<'_, u8>,
+    ) -> Result<Self, ParseError> {
         let mut tlang = None;
         let mut tfields = LiteMap::new();
 
         if let Some(subtag) = iter.peek() {
-            if Language::try_from_bytes(subtag).is_ok() {
+            if Language::try_from_utf8(subtag).is_ok() {
                 tlang = Some(parse_language_identifier_from_iter(
                     iter,
                     ParserMode::Partial,
@@ -208,7 +211,7 @@ impl Transform {
                     has_current_tvalue = false;
                     continue;
                 }
-            } else if let Ok(tkey) = Key::try_from_bytes(subtag) {
+            } else if let Ok(tkey) = Key::try_from_utf8(subtag) {
                 current_tkey = Some(tkey);
             } else {
                 break;
@@ -251,7 +254,7 @@ impl FromStr for Transform {
     type Err = ParseError;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        Self::try_from_bytes(source.as_bytes())
+        Self::try_from_utf8(source.as_bytes())
     }
 }
 

@@ -29,10 +29,27 @@ macro_rules! overview {
 #[macro_export]
 macro_rules! construct {
     ($c:expr, $struct:ident, $struct_name:expr, $data_str:expr) => {
-        $c.bench_function($struct_name, |b| {
+        $c.bench_function(format!("{}/utf8", $struct_name), |b| {
             b.iter(|| {
                 for s in $data_str {
-                    let _: Result<$struct, _> = black_box(s).parse();
+                    let _: Result<$struct, _> = $struct::try_from_utf8(s.as_bytes());
+                }
+            })
+        });
+    };
+}
+
+#[macro_export]
+macro_rules! construct_utf16 {
+    ($c:expr, $struct:ident, $struct_name:expr, $data_str:expr) => {
+        $c.bench_function(format!("{}/utf16", $struct_name), |b| {
+            let data: Vec<Vec<u16>> = $data_str
+                .iter()
+                .map(|s| s.encode_utf16().collect())
+                .collect();
+            b.iter(|| {
+                for s in data.iter() {
+                    let _: Result<$struct, _> = $struct::try_from_utf16(s);
                 }
             })
         });

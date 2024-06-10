@@ -4,7 +4,7 @@
 
 use crate::parser::{
     parse_locale, parse_locale_with_single_variant_single_keyword_unicode_keyword_extension,
-    ParseError, ParserMode, SubtagIterator,
+    subtag_iterator, ParseError, ParserMode, SubtagIterator,
 };
 use crate::subtags::Subtag;
 use crate::{extensions, subtags, LanguageIdentifier};
@@ -117,9 +117,9 @@ impl Locale {
     /// ```
     /// use icu::locale::Locale;
     ///
-    /// Locale::try_from_bytes(b"en-US-u-hc-h12").unwrap();
+    /// Locale::try_from_utf8(b"en-US-u-hc-h12").unwrap();
     /// ```
-    pub fn try_from_bytes(v: &[u8]) -> Result<Self, ParseError> {
+    pub fn try_from_utf8(v: &[u8]) -> Result<Self, ParseError> {
         parse_locale(v)
     }
 
@@ -153,7 +153,7 @@ impl Locale {
     /// );
     /// ```
     pub fn canonicalize<S: AsRef<[u8]>>(input: S) -> Result<String, ParseError> {
-        let locale = Self::try_from_bytes(input.as_ref())?;
+        let locale = Self::try_from_utf8(input.as_ref())?;
         Ok(locale.write_to_string().into_owned())
     }
 
@@ -263,12 +263,12 @@ impl Locale {
             ($T:ty, $iter:ident, $expected:expr) => {
                 $iter
                     .next()
-                    .map(|b| <$T>::try_from_bytes(b) == Ok($expected))
+                    .map(|b| <$T>::try_from_utf8(b) == Ok($expected))
                     .unwrap_or(false)
             };
         }
 
-        let mut iter = SubtagIterator::new(other.as_bytes());
+        let mut iter = subtag_iterator::SubtagIterator::new(other.as_bytes());
         if !subtag_matches!(subtags::Language, iter, self.id.language) {
             return false;
         }
@@ -304,7 +304,7 @@ impl Locale {
 
     #[doc(hidden)] // macro use
     #[allow(clippy::type_complexity)]
-    pub const fn try_from_bytes_with_single_variant_single_keyword_unicode_extension(
+    pub const fn try_from_utf8_with_single_variant_single_keyword_unicode_extension(
         v: &[u8],
     ) -> Result<
         (
@@ -336,7 +336,7 @@ impl FromStr for Locale {
     type Err = ParseError;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        Self::try_from_bytes(source.as_bytes())
+        Self::try_from_utf8(source.as_bytes())
     }
 }
 

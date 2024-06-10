@@ -4,6 +4,7 @@
 
 use crate::extensions::{self, Extensions};
 use crate::parser::errors::ParseError;
+use crate::parser::subtag_iterator;
 use crate::parser::{parse_language_identifier_from_iter, ParserMode, SubtagIterator};
 use crate::{
     subtags::{self, Subtag},
@@ -13,7 +14,7 @@ use crate::{
 use super::parse_locale_with_single_variant_single_keyword_unicode_extension_from_iter;
 
 pub fn parse_locale(t: &[u8]) -> Result<Locale, ParseError> {
-    let mut iter = SubtagIterator::new(t);
+    let mut iter = subtag_iterator::SubtagIterator::new(t);
 
     let id = parse_language_identifier_from_iter(&mut iter, ParserMode::Locale)?;
     let extensions = if iter.peek().is_some() {
@@ -38,6 +39,6 @@ pub const fn parse_locale_with_single_variant_single_keyword_unicode_keyword_ext
     ),
     ParseError,
 > {
-    let iter = SubtagIterator::new(t);
+    let iter = subtag_iterator::SubtagIterator::new(t);
     parse_locale_with_single_variant_single_keyword_unicode_extension_from_iter(iter, mode)
 }

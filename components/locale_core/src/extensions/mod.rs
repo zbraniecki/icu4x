@@ -58,6 +58,7 @@ use unicode::{Unicode, UNICODE_EXT_CHAR};
 
 use alloc::vec::Vec;
 
+use crate::parser::subtag_iterator;
 use crate::parser::ParseError;
 use crate::parser::SubtagIterator;
 use crate::subtags;
@@ -77,7 +78,7 @@ pub enum ExtensionType {
 }
 
 impl ExtensionType {
-    pub(crate) const fn try_from_byte_slice(key: &[u8]) -> Result<Self, ParseError> {
+    pub(crate) const fn try_from_utf8_slice(key: &[u8]) -> Result<Self, ParseError> {
         if let [b] = key {
             Self::try_from_byte(*b)
         } else {
@@ -96,7 +97,7 @@ impl ExtensionType {
         }
     }
 
-    pub(crate) const fn try_from_bytes_manual_slice(
+    pub(crate) const fn try_from_utf8_manual_slice(
         bytes: &[u8],
         start: usize,
         end: usize,
@@ -250,7 +251,9 @@ impl Extensions {
             .retain(|o| predicate(ExtensionType::Other(o.get_ext_byte())));
     }
 
-    pub(crate) fn try_from_iter(iter: &mut SubtagIterator) -> Result<Self, ParseError> {
+    pub(crate) fn try_from_iter(
+        iter: &mut subtag_iterator::SubtagIterator<'_, u8>,
+    ) -> Result<Self, ParseError> {
         let mut unicode = None;
         let mut transform = None;
         let mut private = None;

@@ -41,9 +41,9 @@ impl Value {
     /// ```
     /// use icu::locale::extensions::transform::Value;
     ///
-    /// let value = Value::try_from_bytes(b"hybrid").expect("Parsing failed.");
+    /// let value = Value::try_from_utf8(b"hybrid").expect("Parsing failed.");
     /// ```
-    pub fn try_from_bytes(input: &[u8]) -> Result<Self, ParseError> {
+    pub fn try_from_utf8(input: &[u8]) -> Result<Self, ParseError> {
         let mut v = ShortBoxSlice::default();
         let mut has_value = false;
 
@@ -52,7 +52,7 @@ impl Value {
                 return Err(ParseError::InvalidExtension);
             }
             has_value = true;
-            let val = Subtag::try_from_bytes(subtag).map_err(|_| ParseError::InvalidExtension)?;
+            let val = Subtag::try_from_utf8(subtag).map_err(|_| ParseError::InvalidExtension)?;
             if val != TRUE_TVALUE {
                 v.push(val);
             }
@@ -76,7 +76,7 @@ impl Value {
         if !TYPE_LENGTH.contains(&t.len()) {
             return Err(ParseError::InvalidExtension);
         }
-        let s = Subtag::try_from_bytes(t).map_err(|_| ParseError::InvalidSubtag)?;
+        let s = Subtag::try_from_utf8(t).map_err(|_| ParseError::InvalidSubtag)?;
 
         let s = s.to_ascii_lowercase();
 
@@ -104,7 +104,7 @@ impl FromStr for Value {
     type Err = ParseError;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        Self::try_from_bytes(source.as_bytes())
+        Self::try_from_utf8(source.as_bytes())
     }
 }
 

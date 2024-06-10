@@ -37,6 +37,7 @@ use core::str::FromStr;
 pub use other::{subtag, Subtag};
 
 use super::ExtensionType;
+use crate::parser::subtag_iterator;
 use crate::parser::ParseError;
 use crate::parser::SubtagIterator;
 use crate::shortvec::ShortBoxSlice;
@@ -115,11 +116,11 @@ impl Private {
         Self(ShortBoxSlice::new_single(input))
     }
 
-    pub(crate) fn try_from_bytes(t: &[u8]) -> Result<Self, ParseError> {
-        let mut iter = SubtagIterator::new(t);
+    pub(crate) fn try_from_utf8(t: &[u8]) -> Result<Self, ParseError> {
+        let mut iter = subtag_iterator::SubtagIterator::new(t);
 
         let ext = iter.next().ok_or(ParseError::InvalidExtension)?;
-        if let ExtensionType::Private = ExtensionType::try_from_byte_slice(ext)? {
+        if let ExtensionType::Private = ExtensionType::try_from_utf8_slice(ext)? {
             return Self::try_from_iter(&mut iter);
         }
 
@@ -147,9 +148,11 @@ impl Private {
         self.0.clear();
     }
 
-    pub(crate) fn try_from_iter(iter: &mut SubtagIterator) -> Result<Self, ParseError> {
+    pub(crate) fn try_from_iter(
+        iter: &mut subtag_iterator::SubtagIterator<'_, u8>,
+    ) -> Result<Self, ParseError> {
         let keys = iter
-            .map(Subtag::try_from_bytes)
+            .map(Subtag::try_from_utf8)
             .collect::<Result<ShortBoxSlice<_>, _>>()?;
 
         Ok(Self(keys))
@@ -173,7 +176,7 @@ impl FromStr for Private {
     type Err = ParseError;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        Self::try_from_bytes(source.as_bytes())
+        Self::try_from_utf8(source.as_bytes())
     }
 }
 

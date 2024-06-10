@@ -31,6 +31,7 @@ fn langid_benches(c: &mut Criterion) {
             let mut group = c.benchmark_group("langid/construct");
 
             construct!(group, LanguageIdentifier, "langid", &data.canonicalized);
+            construct_utf16!(group, LanguageIdentifier, "langid", &data.canonicalized);
 
             group.finish();
         }

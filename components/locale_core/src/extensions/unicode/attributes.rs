@@ -4,6 +4,7 @@
 
 use super::Attribute;
 
+use crate::parser::subtag_iterator;
 use crate::parser::SubtagIterator;
 use crate::shortvec::ShortBoxSlice;
 use crate::ParseError;
@@ -75,8 +76,8 @@ impl Attributes {
         Self(input.into())
     }
 
-    pub(crate) fn try_from_bytes(t: &[u8]) -> Result<Self, ParseError> {
-        let mut iter = SubtagIterator::new(t);
+    pub(crate) fn try_from_utf8(t: &[u8]) -> Result<Self, ParseError> {
+        let mut iter = subtag_iterator::SubtagIterator::new(t);
         Self::try_from_iter(&mut iter)
     }
 
@@ -105,11 +106,13 @@ impl Attributes {
         core::mem::take(self)
     }
 
-    pub(crate) fn try_from_iter(iter: &mut SubtagIterator) -> Result<Self, ParseError> {
+    pub(crate) fn try_from_iter(
+        iter: &mut subtag_iterator::SubtagIterator<'_, u8>,
+    ) -> Result<Self, ParseError> {
         let mut attributes = ShortBoxSlice::new();
 
         while let Some(subtag) = iter.peek() {
-            if let Ok(attr) = Attribute::try_from_bytes(subtag) {
+            if let Ok(attr) = Attribute::try_from_utf8(subtag) {
                 if let Err(idx) = attributes.binary_search(&attr) {
                     attributes.insert(idx, attr);
                 }
@@ -133,7 +136,7 @@ impl FromStr for Attributes {
     type Err = ParseError;
 
     fn from_str(source: &str) -> Result<Self, Self::Err> {
-        Self::try_from_bytes(source.as_bytes())
+        Self::try_from_utf8(source.as_bytes())
     }
 }
 

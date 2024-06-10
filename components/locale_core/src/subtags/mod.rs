@@ -102,8 +102,13 @@ impl Subtag {
     }
 
     #[doc(hidden)]
-    pub fn as_tinystr(&self) -> tinystr::TinyAsciiStr<8> {
+    pub const fn as_tinystr(&self) -> tinystr::TinyAsciiStr<8> {
         self.0
+    }
+
+    #[doc(hidden)]
+    pub const fn len(&self) -> usize {
+        self.0.len()
     }
 
     pub(crate) fn to_ascii_lowercase(self) -> Self {
@@ -115,7 +120,7 @@ impl<const N: usize> TryFrom<tinystr::TinyAsciiStr<N>> for Subtag {
     type Error = crate::parser::errors::ParseError;
 
     fn try_from(value: tinystr::TinyAsciiStr<N>) -> Result<Self, Self::Error> {
-        Self::try_from_bytes(value.as_bytes())
+        Self::try_from_utf8(value.as_bytes())
     }
 }
 
