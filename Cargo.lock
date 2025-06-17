@@ -1517,6 +1517,16 @@ name = "icu_locale_data"
 version = "2.0.0"
 
 [[package]]
+name = "icu_locale_negotiation"
+version = "2.0.0"
+dependencies = [
+ "criterion",
+ "icu_locale",
+ "icu_locale_data",
+ "icu_provider",
+]
+
+[[package]]
 name = "icu_normalizer"
 version = "2.0.0"
 dependencies = [

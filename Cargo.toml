@@ -23,6 +23,7 @@ members = [
     "components/icu",
     "components/list",
     "components/locale",
+    "components/locale_negotiation",
     "components/normalizer",
     "components/pattern",
     "components/plurals",
@@ -103,7 +104,7 @@ exclude = [
     # Examples are tested outside the workspace to simulate external users
     "examples",
     # Don't publish the graveyard
-    "tools/graveyard"
+    "tools/graveyard",
 ]
 
 [workspace.package]
@@ -257,7 +258,9 @@ serde = { version = "1.0.110", default-features = false }
 serde-json-core = { version = "0.6.0", default-features = false }
 smallvec = { version = "1.10.0", default-features = false }
 stable_deref_trait = { version = "1.2.0", default-features = false }
-twox-hash = { version = "2.0.0", default-features = false, features = ["xxhash64"] }
+twox-hash = { version = "2.0.0", default-features = false, features = [
+    "xxhash64",
+] }
 unicode-bidi = { version = "0.3.11", default-features = false }
 utf16_iter = { version = "1.0.2", default-features = false }
 utf8_iter = { version = "1.0.2", default-features = false }
@@ -274,7 +277,7 @@ toml = { version = "0.8.0", default-features = false, features = ["parse"] }
 arraystring = "0.3.0"
 askama = "0.13"
 atoi = "2.0.0"
-bincode = "1.3.1" # Can be updated to 2.0 after MSRV 1.85
+bincode = "1.3.1"        # Can be updated to 2.0 after MSRV 1.85
 clap = "4.2.0"
 combine = "4.3.1"
 criterion = "0.5.0"
